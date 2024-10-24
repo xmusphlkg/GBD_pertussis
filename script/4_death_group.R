@@ -100,11 +100,149 @@ outcome <- lapply(1:length(locations), plot_fun)
 
 outcome[[length(locations) + 1]] <- guide_area()
 
-p <- wrap_plots(outcome, ncol = 2) + plot_layout(guides = "collect")
+
+fig1 <- wrap_plots(outcome, ncol = 4) + plot_layout(guides = "collect")
+
+# map ---------------------------------------------------------------------
+
+## loading data
+data_map <- st_read("./data/world.zh.json") |> 
+     filter(iso_a3  != "ATA")
+data_map_iso <- read.csv('./data/iso_code.csv')
+
+data_death_1990 <- read.csv('./data/preparedata/Country_1990.csv') |> 
+     filter(measure_name == "Deaths" & year == 1990) |>
+     select(location_name, year, age_name, val)
+data_death_2021 <- read.csv('./data/preparedata/Country_2021.csv') |> 
+     filter(measure_name == "Deaths" & year == 2021) |>
+     select(location_name, year, age_name, val)
+data_death <- rbind(data_death_1990, data_death_2021)
+
+remove(data_death_1990, data_death_2021)
+
+# find all countries, year with 0 cases
+data_death_zero <- data_death |> 
+     group_by(location_name, year) |> 
+     summarise(All = round(sum(val)),
+               .groups = 'drop') |> 
+     filter(All >= 40)
+
+## estimate median age
+data_death <- data_death |> 
+     filter(age_name %in% c('<1 year',  '2-4 years', '5-9 years', '10-14 years', '15-19 years',
+                            '20-24 years', '25-29 years', '30-34 years', '35-39 years', '40-44 years',
+                            '45-49 years', '50-54 years', '55-59 years')) |> 
+     mutate(Age = case_when(age_name == '<1 year' ~ '0-1',
+                            TRUE ~ str_replace_all(age_name, " years", "")),
+            StartAge = as.numeric(sub("-.*", "", Age)),
+            EndAge = as.numeric(sub(".*-", "", Age)),
+            MiddleAge = (StartAge + EndAge) / 2,
+            StartAge = if_else(StartAge == 0, 0, StartAge - 0)) |>
+     left_join(data_death_zero, by = c("location_name", "year")) |>
+     filter(!is.na(All)) |>
+     rename(Cases = val) |>
+     group_by(location_name, year) |>
+     mutate(Weight = Cases/sum(Cases),
+            CasesAll = sum(Cases)) |> 
+     select(location_name, year, Age, StartAge, EndAge, MiddleAge, Cases, CasesAll, Weight) |> 
+     arrange(location_name, year, MiddleAge)
+
+data_median_age <- data_death |> 
+     rowwise() |>
+     mutate(AgeList = if_else(is.na(StartAge), list(NA_real_), list(seq(StartAge, EndAge, 0.01))) ) |>
+     unnest(cols = c(AgeList)) |>
+     filter(!is.na(AgeList)) |>
+     group_by(location_name, year, AgeList) |>
+     mutate(AverageCases = Cases / ((EndAge - StartAge)*100 + 1)) |>
+     ungroup() |>
+     select(location_name, year, Age = AgeList, AverageCases) |>
+     group_by(location_name, year) |>
+     mutate(Weight = AverageCases / sum(AverageCases),
+            Weight = case_when(is.na(Weight) ~ 0,
+                               TRUE ~ Weight),
+            cum_weight = cumsum(Weight)) |>
+     summarise(MedianAge = Age[min(which(cum_weight >= 0.5))],
+               .groups = 'drop')
+
+data_median_diff <- data_median_age |> 
+     pivot_wider(names_from = year, values_from = MedianAge) |>
+     mutate(Diff = `2021` - `1990`) |> 
+     left_join(data_map_iso, by = c("location_name" = "location_name"))
+
+## check all locations in map data
+data_median_diff[!data_median_diff$ISO3 %in% data_map$iso_a3, ]
+
+## create map plot for 2021
+data_map_year <- data_map |> 
+     left_join(data_median_diff, by = c("iso_a3" = "ISO3"))
+
+fig2 <- ggplot(data = data_map_year) +
+     geom_sf(aes(fill = `2021`)) +
+     # add x, y tick labels
+     theme(axis.text.x = element_text(size = 8),
+           axis.text.y = element_text(size = 8)) +
+     scale_x_continuous(limits = c(-180, 180),
+                        expand = c(0, 0)) + 
+     scale_y_continuous(limits = c(-60, 75)) +
+     scale_fill_gradientn(colours = paletteer_d("Redmonder::dPBIRdGn"),
+                          limits = c(0, 4),
+                          breaks = seq(0, 4, 0.5),
+                          na.value = 'grey50')+
+     theme_bw() +
+     theme(panel.grid = element_blank(),
+           panel.background = element_rect(fill = "#5A98BF50", color = NA),
+           axis.text = element_text(color = 'black', face = 'plain'),
+           axis.title = element_text(color = 'black', face = 'plain'),
+           plot.title.position = 'plot',
+           legend.position = 'bottom')+
+     guides(fill = guide_colorbar(barwidth = 20,
+                                  title.position = 'top',
+                                  barheight = 1)) +
+     labs(title = paste0(letters[length(locations) + 1], ")"),
+          x = NULL,
+          y = NULL,
+          fill = 'Median age of deaths in 2021')
+
+## create map plot for diff
+fill_colors <- paletteer_d("Redmonder::dPBIPuOr")
+
+fig3 <- ggplot(data = data_map_year) +
+     geom_sf(aes(fill = Diff)) +
+     # add x, y tick labels
+     theme(axis.text.x = element_text(size = 8),
+           axis.text.y = element_text(size = 8)) +
+     scale_x_continuous(limits = c(-180, 180),
+                        expand = c(0, 0)) +
+     scale_y_continuous(limits = c(-60, 75)) +
+     scale_fill_gradientn(colours = fill_colors,
+                          limits = c(-1.6, 1.6),
+                          breaks = seq(-1.6, 1.6, 0.4),
+                          na.value = 'grey50')+
+     theme_bw() +
+     theme(panel.grid = element_blank(),
+           panel.background = element_rect(fill = "#5A98BF50", color = NA),
+           axis.text = element_text(color = 'black', face = 'plain'),
+           axis.title = element_text(color = 'black', face = 'plain'),
+           plot.title.position = 'plot',
+           legend.position = 'bottom')+
+     guides(fill = guide_colorbar(barwidth = 20,
+                                  title.position = 'top',
+                                  barheight = 1)) +
+     labs(title = paste0(letters[length(locations) + 2], ")"),
+          x = NULL,
+          y = NULL,
+          fill = 'Difference of median age between 2021 and 1990')
+
+# save --------------------------------------------------------------------
+
+fig <- cowplot::plot_grid(fig1,
+                          fig2 | fig3,
+                          nrow = 2,
+                          rel_heights = c(1, 0.7))
 
 ggsave(filename = "outcome/fig4.pdf",
-       plot = p,
-       width = 6,
-       height = 10,
+       plot = fig,
+       width = 10,
+       height = 8.5,
        device = cairo_pdf,
        family = "Arial")
