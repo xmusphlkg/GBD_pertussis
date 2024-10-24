@@ -23,7 +23,7 @@ data_raw_incidence <- data_list_incidence |>
      map_dfr(read.csv)
 
 data_raw_incidence <- data_raw_incidence |> 
-     filter(measure_name == "Incidence") |>
+     filter(measure_name == "Incidence" & year >= 1990) |>
      select(location_id, location_name, sex_name, age_name, year, metric_name, val, upper, lower) |> 
      filter(metric_name %in% c("Number", "Rate"))
      

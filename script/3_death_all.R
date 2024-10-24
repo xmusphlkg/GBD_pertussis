@@ -23,7 +23,7 @@ data_raw_death <- data_list_death |>
      map_dfr(read.csv)
 
 data_raw_death <- data_raw_death |> 
-     filter(measure_name == "Deaths") |>
+     filter(measure_name == "Deaths" & year >= 1990) |>
      select(location_id, location_name, sex_name, age_name, year, metric_name, val, upper, lower) |> 
      filter(metric_name %in% c("Number", "Rate"))
 
@@ -46,8 +46,6 @@ data_panel_A <- data_panel_A |>
      mutate(jp = as.numeric(jp_model$data_export$model),
             stage = case_when(year >= jp_apc$segment_start[1] & year < jp_apc$segment_end[1] ~ 1,
                               year >= jp_apc$segment_start[2] & year < jp_apc$segment_end[2] ~ 2,
-                              year >= jp_apc$segment_start[3] & year < jp_apc$segment_end[3] ~ 3,
-                              year >= jp_apc$segment_start[4] & year <= jp_apc$segment_end[4] ~ 4,
                               TRUE ~ 0))
 
 fig1 <- ggplot(data_panel_A, aes(x = year, y = val, group = 'A')) +
@@ -62,13 +60,9 @@ fig1 <- ggplot(data_panel_A, aes(x = year, y = val, group = 'A')) +
                         expand = expansion(mult = c(0, 0.05))) +
      scale_color_manual(values = c(death = "#E84A5FFF",
                                    `1` = "#FECEA8FF",
-                                   `2` = "#99B898FF",
-                                   `3` = '#FF847CFF',
-                                   `4` = "#019875FF"),
+                                   `2` = "#99B898FF"),
                         labels = c(paste0(jp_apc$segment_start[1], '-', jp_apc$segment_end[1], ' APC=', round(jp_apc$apc[1], 2), "*"),
                                    paste0(jp_apc$segment_start[2], '-', jp_apc$segment_end[2], ' APC=', round(jp_apc$apc[2], 2), "*"),
-                                   paste0(jp_apc$segment_start[3], '-', jp_apc$segment_end[3], ' APC=', round(jp_apc$apc[3], 2), "*"),
-                                   paste0(jp_apc$segment_start[4], '-', jp_apc$segment_end[4], ' APC=', round(jp_apc$apc[4], 2), "*"),
                                    "Mortality rate (95%CI)"))+
      theme_bw()+
      theme(plot.title.position = "plot",
@@ -78,7 +72,7 @@ fig1 <- ggplot(data_panel_A, aes(x = year, y = val, group = 'A')) +
           color = NULL,
           x = "Year",
           y = "Mortality rate, per 100,000")+
-     guides(color = guide_legend(override.aes = list(linetype=c(1,1,1,1,1), shape=c(NA,NA,NA,NA,19))))
+     guides(color = guide_legend(override.aes = list(linetype=c(1,1,1), shape=c(NA,NA,19))))
 
 # panel B -----------------------------------------------------------------
 
