@@ -4,14 +4,12 @@ library(shiny)
 library(shinyWidgets)
 library(shinydashboard)
 library(shinythemes)
-library(DT)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
 library(stringr)
 library(openxlsx)
 library(datamods)
-library(lubridate)
 
 load("data.RData")
 
@@ -40,7 +38,9 @@ ui <- fluidPage(
                     id = 'InputData',
                     from = c("env", "file", "copypaste", "googlesheets", "url"),
                     file_extensions = c(".csv", ".txt", ".xlsx")
-               )
+               ),
+               footer = tags$span("Example data were provided in environment, and you can also upload your own data from ",
+                             tags$a("GBD 2021", href = "https://vizhub.healthdata.org/gbd-results/"))
           ),
           box(
                width = 6,
@@ -72,104 +72,35 @@ ui <- fluidPage(
                width = 6,
                title = 'Data Settings',
                status = 'danger',
-               verbatimTextOutput(outputId = "data_filter_summary")
+               tags$b("Data Filter Summary:"),
+               verbatimTextOutput(outputId = "data_filter_summary"),
+               tags$b("Date Transition:"),
+               verbatimTextOutput(outputId = "data_age"),
+               tags$b("Date Check:"),
+               verbatimTextOutput(outputId = "data_check")
           )
      ),
-     ## KDE -----------------------------
+     ## median -----------------------------
      box(
-          title = 'Step 3: Kernel Density Estimation Setting',
-          # setting model for Kernel Density Estimation
+          title = 'Step 3: Estimation Logs',
           width = 12,
           collapsible = T,
           status = 'danger',
           conditionalPanel(
                condition = "output.data_filter_summary",
-               fluidRow(
-                    column(
-                         width = 3,
-                         # setting bw for Kernel Density Estimation
-                         selectInput(
-                              inputId = "model_bw",
-                              label = HTML('Bandwidth <i id="info-bw" class="fa fa-info-circle"></i>'),
-                              choices = c("nrd0", "nrd", "ucv", "bcv", 'SJ'),
-                              selected = "nrd0"
-                         ),
-                         bsTooltip(id = "info-bw",
-                                   title = "the smoothing bandwidth to be used. The default is ‘nrd0’.",
-                                   placement = "right", trigger = "hover")
-                    ),
-                    column(
-                         width = 3,
-                         # setting adjust for Kernel Density Estimation
-                         numericInput(
-                              inputId = "model_adjust",
-                              label = HTML('Adjust <i id="info-adjust" class="fa fa-info-circle"></i>'),
-                              value = 1
-                         ),
-                         bsTooltip(id = "info-adjust",
-                                   title = "the bandwidth used is actually adjust*bw. This makes it easy to specify values like ‘half the default’ bandwidth.",
-                                   placement = "right", trigger = "hover")
-                    ),
-                    column(
-                         width = 3,
-                         # setting kernel for Kernel Density Estimation
-                         selectInput(
-                              inputId = "model_kernel",
-                              label = HTML('Kernel <i id="info-kernel" class="fa fa-info-circle"></i>'),
-                              choices = c("gaussian", "epanechnikov", "rectangular", "triangular", "biweight", "cosine", "optcosine"),
-                              selected = "gaussian"
-                         ),
-                         bsTooltip(id = "info-kernel",
-                                   title = 'a character string giving the smoothing kernel to be used.  <br> This must partially match one of "gaussian", "rectangular", "triangular", "epanechnikov", "biweight", "cosine" or "optcosine", with default "gaussian", and may be abbreviated to a unique prefix (single letter). "cosine" is smoother than "optcosine", which is the usual ‘cosine’ kernel in the literature and almost MSE-efficient. However, "cosine" is the version used by S.',
-                                   placement = "right", trigger = "hover")
-                    ),
-                    column(
-                         width = 3,
-                         # setting n for Kernel Density Estimation
-                         numericInput(
-                              inputId = "model_n",
-                              label = HTML('n <i id="info-n" class="fa fa-info-circle"></i>'),
-                              value = 512
-                         ),
-                         bsTooltip(id = "info-n",
-                                   title = "the number of equally spaced points at which the density is to be estimated. The default is 512.",
-                                   placement = "right", trigger = "hover")
+               column(
+                    12,
+                    actionButton(
+                         inputId = "start_estimate",
+                         label = "Start Estimation",
+                         style = "color: #fff; background-color: #337ab7; border-color: #2e6da4;"
                     )
                ),
-               fluidRow(
-                    column(
-                         width = 3,
-                         # setting from for Kernel Density Estimation
-                         numericInput(
-                              inputId = "model_from",
-                              label = HTML('From <i id="info-from" class="fa fa-info-circle"></i>'),
-                              value = 0
-                         ),
-                         bsTooltip(id = "info-from",
-                                   title = "the minimum of the range of x values for which density is to be estimated. The default is the minimum of the data values.",
-                                   placement = "right", trigger = "hover")
-                    ),
-                    column(
-                         width = 3,
-                         # setting to for Kernel Density Estimation
-                         numericInput(
-                              inputId = "model_to",
-                              label = HTML('To <i id="info-to" class="fa fa-info-circle"></i>'),
-                              value = 100
-                         ),
-                         bsTooltip(id = "info-to",
-                                   title = "the maximum of the range of x values for which density is to be estimated. The default is the maximum of the data values.",
-                                   placement = "right", trigger = "hover")
-                    ),
-                    column(
-                         width = 3,
-                         # start for Kernel Density Estimation
-                         actionButton(
-                              inputId = "start_kde",
-                              label = "Start KDE",
-                              style = "color: #fff; background-color: #337ab7; border-color: #2e6da4; margin-top: 25px;"
-                         )
-                    )
+               column(
+                    12,
+                    tags$div(
+                         tags$h4("Estimation Logs"),
+                         verbatimTextOutput(outputId = "log_output"))
                )
           )
      ),
@@ -177,7 +108,24 @@ ui <- fluidPage(
           title = 'Step 4: Outcome',
           width = 12,
           collapsible = T,
-          status = 'danger'
+          status = 'danger',
+          conditionalPanel(
+               condition = "output.data_filter_summary",
+               column(
+                    12,
+                    plotOutput(
+                         outputId = "outcome_1",
+                         width = "100%"
+                    )
+               ),
+               column(
+                    12,
+                    downloadButton(
+                         "downloadData",
+                         "Download"
+                    )
+               )
+          )
      ),
      # add footer
      column(
@@ -186,22 +134,16 @@ ui <- fluidPage(
                tags$p(
                     "Author: Kangguo Li",
                     tags$br(),
-                    tags$em("Version 2.0.0"),
+                    tags$em("Version 1.0.0"),
                     tags$br(),
-                    tags$em("Last updated: 2024-03-12"),
+                    tags$em("Last updated: 2024-10-25"),
                     tags$br(),
                     tags$em("Host: shinyapps.io"),
                     tags$br(),
                     tags$a(
-                         href = "https://github.com/xmusphlkg/code_PHSM",
+                         href = "https://github.com/xmusphlkg/GBD_pertussis",
                          icon("github"),
                          title = "Source Code",
-                         style = "margin: 10px"
-                    ),
-                    tags$a(
-                         href = "https://github.com/xmusphlkg/code_PHSM",
-                         icon("file-pdf"),
-                         title = "DOI",
                          style = "margin: 10px"
                     ),
                     style = "text-align: center; color: #777; font-size: 12px; margin-top: 10px;"
@@ -217,8 +159,8 @@ server <- function(input, output, session) {
      GlobalData <- reactiveValues(
           data = NULL,
           data_filter = NULL,
-          data_age = NULL,
-          data_median = NULL
+          data_median = NULL,
+          logs = "## Start estimation"
      )
      
      ## import data--------------------------------------------------------------
@@ -284,6 +226,10 @@ server <- function(input, output, session) {
      # filter data
      observeEvent(GlobalData$data, {
           Data <- GlobalData$data
+          location_name <- unique(Data$location_name)
+          sex_name <- unique(Data$sex_name)
+          age_name <- unique(Data$age_name)
+          measure_name <- unique(Data$measure_name)
 
           output$filter_ui <- renderUI({
                tags$div(
@@ -292,8 +238,10 @@ server <- function(input, output, session) {
                          selectInput(
                               inputId = "data_location_name",
                               label = "Location Name",
-                              choices = unique(Data$location_name),
-                              selected = unique(Data$location_name),
+                              selected = ifelse(length(location_name) > 5,
+                                               location_name[1:5],
+                                               location_name),
+                              choices = location_name,
                               multiple = T
                          )
                     ),
@@ -302,8 +250,10 @@ server <- function(input, output, session) {
                          selectInput(
                               inputId = "data_sex_name",
                               label = "Sex Name",
-                              choices = unique(Data$sex_name),
-                              selected = unique(Data$sex_name),
+                              selected = ifelse(length(sex_name) > 5,
+                                               sex_name[1:5],
+                                               sex_name),
+                              choices = sex_name,
                               multiple = T
                          )
                     ),
@@ -312,8 +262,10 @@ server <- function(input, output, session) {
                          selectInput(
                               inputId = "data_age_name",
                               label = "Age Name",
-                              choices = sort(unique(Data$age_name)),
-                              selected = sort(unique(Data$age_name)),
+                              selected = ifelse(length(age_name) > 5,
+                                               age_name[1:5],
+                                               age_name),
+                              choices = age_name,
                               multiple = T
                          )
                     ),
@@ -328,7 +280,7 @@ server <- function(input, output, session) {
                          )
                     ),
                     column(
-                         10,
+                         6,
                          sliderInput(
                               inputId = "data_year_range",
                               label = "Year Range",
@@ -337,6 +289,20 @@ server <- function(input, output, session) {
                               value = c(min(Data$year), max(Data$year)),
                               step = 1
                          )
+                    ),
+                    column(
+                         6,
+                         sliderInput(
+                              inputId = "data_age_digits",
+                              label = HTML("Number of Digits <i id='info-age-digits' class='fa fa-info-circle'></i>"),
+                              min = 0,
+                              max = 4,
+                              value = 2,
+                              step = 1
+                         ),
+                         bsTooltip(id = "info-age-digits",
+                                   title = "Number of digits to round the age, the more digits, the more accurate the age and the more time it takes to calculate",
+                                   placement = "right", trigger = "hover")
                     ),
                     column(
                          2,
@@ -353,268 +319,179 @@ server <- function(input, output, session) {
      ## add start and end year --------------------------
      observeEvent(input$filter_data, {
           Data <- GlobalData$data
+          number_of_digits <- input$data_age_digits
           data_filter <- Data  |> 
                filter(location_name %in% input$data_location_name &
                            sex_name %in% input$data_sex_name &
                            age_name %in% input$data_age_name &
                            measure_name == input$data_measure_name &
                            year >= input$data_year_range[1] &
-                           year <= input$data_year_range[2]) |> 
-               mutate(Age = str_replace_all(age_name, "<", "0-"),
-                      # replace "+ years" with "-100 years"
-                      Age = str_replace_all(Age, "\\+ years", "-100 years"),
-                      Age = str_replace_all(Age, " years", ""),
-                      StartAge = as.numeric(sub("-.*", "", Age)),
-                      EndAge = as.numeric(sub(".*-", "", Age)),
-                      MiddleAge = (StartAge + EndAge) / 2,
-                      StartAge = if_else(StartAge == 0, 0, StartAge - 0),
-                      EndAge = if_else(EndAge == 100, 100, EndAge + 0.99))
-          GlobalData$data_filter <- data_filter
+                           year <= input$data_year_range[2])
+          
+          data_filter_years <- data_filter  |> 
+               filter(str_detect(age_name, "year"))
+          if (nrow(data_filter_years) > 0) {
+               data_filter_years <- data_filter_years |>
+                    mutate(Age = str_replace_all(age_name, "<", "0-"),
+                           Age = str_replace_all(Age, "\\+ years", "-100 years"),
+                           Age = str_replace_all(Age, " years", ""),
+                           StartAge = as.numeric(sub("-.*", "", Age)),
+                           EndAge = as.numeric(sub(".*-", "", Age)),
+                           MiddleAge = (StartAge + EndAge) / 2,
+                           EndAge = if_else(str_detect(age_name, "<"), EndAge-1, EndAge),
+                           EndAge = if_else(EndAge == 100, 100, EndAge + 1 - 10^(-number_of_digits)))
+          } else {
+               # using empty data frame to keep the same structure
+               data_filter_years <- data_filter[0, ]
+          }
+          
+          
+          data_filter_months <- data_filter  |> 
+               filter(str_detect(age_name, "month"))
+          if (nrow(data_filter_months) > 0) {
+               data_filter_months <- data_filter_months |>
+                    mutate(Age = str_replace_all(age_name, "<", "0-"),
+                           Age = str_replace_all(Age, " months", ""),
+                           StartAge = as.numeric(sub("-.*", "", Age)),
+                           EndAge = as.numeric(sub(".*-", "", Age)),
+                           MiddleAge = (StartAge + EndAge) / 2,
+                           EndAge = if_else(str_detect(age_name, "<"), EndAge-1, EndAge),
+                           EndAge = if_else(EndAge == 100, 100, EndAge + 1 - 10^(-number_of_digits)),
+                           StartAge = StartAge / 12,
+                           EndAge = EndAge / 12,
+                           MiddleAge = MiddleAge / 12)
+          } else {
+               data_filter_months <- data_filter[0, ]
+          }
+          
+          data_filter_days <- data_filter  |>
+               filter(str_detect(age_name, "day"))
+          if (nrow(data_filter_days) > 0) {
+               data_filter_days <- data_filter_days |>
+                    mutate(Age = str_replace_all(age_name, "<", "0-"),
+                           Age = str_replace_all(Age, " days", ""),
+                           StartAge = as.numeric(sub("-.*", "", Age)),
+                           EndAge = as.numeric(sub(".*-", "", Age)),
+                           MiddleAge = (StartAge + EndAge) / 2,
+                           EndAge = if_else(str_detect(age_name, "<"), EndAge-1, EndAge),
+                           EndAge = if_else(EndAge == 100, 100, EndAge + 1 - 10^(-number_of_digits)),
+                           StartAge = StartAge / 365.25,
+                           EndAge = EndAge / 365.25,
+                           MiddleAge = MiddleAge / 365.25)
+          } else {
+               data_filter_days <- data_filter[0, ]
+          }
+          
+          data_filter <- rbind(data_filter_years, data_filter_months, data_filter_days)
+          
+          data_date <- data_filter |> 
+               select(age_name, Age, StartAge, EndAge, MiddleAge) |> 
+               unique() |> 
+               arrange(StartAge, EndAge) |> 
+               mutate(Overlaps = if_else(StartAge < lag(EndAge, default = 0), 1, 0))
           
           output$data_filter_summary <- renderPrint({
-               str(data_filter)
+               data_filter |> 
+                    select(location_name, sex_name, age_name, measure_name, year, val) |> 
+                    str()
+          })
+          
+          output$data_age <- renderPrint({
+               data_date
+          })
+          
+          ## check the range of age is overlapped
+          output$data_check <- renderPrint({
+               data_overlaps <- any(data_date$Overlaps == 1)
+               if (data_overlaps) {
+                    GlobalData$data_filter <- NULL
+                    showNotification(ui = "Age range is overlapped, please check the data and filter again",
+                                     type = "error",
+                                     duration = 60)
+                    print("Age range is overlapped, please check the data and filter again")
+               } else {
+                    GlobalData$data_filter <- data_filter
+                    showNotification(ui = "Age range is not overlapped, data is ready for analysis",
+                                     type = "default",
+                                     duration = 5)
+                    print("Age range is not overlapped, data is ready for analysis")
+               }
           })
      })
      
-     ## KDE ---------------------------------------------------------------------
+     ## Median ---------------------------------------------------------------------
+     
+     output$log_output <- renderText({
+          GlobalData$logs
+     })
 
-     # observeEvent(GlobalData$split_Data, {
-     #      Data <- GlobalData$split_Data
-     #      # detect input$split_by is not null
-     #      if (is.null(input$split_by)) {
-     #           output$split_info <- renderPrint({
-     #                "Not required to split data"
-     #           })
-     #      } else {
-     #           output$split_info <- renderPrint({
-     #                paste("Split by", input$split_by, "with value", input$split_type)
-     #           })
-     #      }
-     #      output$split_data <- renderPrint({
-     #           str(Data)
-     #      })
-     #      # auto detect frequency
-     #      # browser()
-     #      freq <- detect_frequency(Data$date)
-     #      if (freq == 365.25) {
-     #           Data <- Data |> 
-     #                select(date, value) |>
-     #                complete(date = seq.Date(min(date), max(date), by = "day"),
-     #                         fill = list(value = 0))
-     #           start_date <- c(year(min(Data$date)), yday(min(Data$date)))
-     #           end_date <- c(year(max(Data$date)), yday(max(Data$date)))
-     #      } else if (freq == 12) {
-     #           Data <- Data |> 
-     #                select(date, value) |>
-     #                complete(date = seq.Date(min(date), max(date), by = "month"),
-     #                         fill = list(value = 0))
-     #           start_date <- c(year(min(Data$date)), month(min(Data$date)))
-     #           end_date <- c(year(max(Data$date)), month(max(Data$date)))
-     #      } else {
-     #           Data <- Data |> 
-     #                select(date, value) |>
-     #                complete(date = seq.Date(min(date), max(date), by = "day"),
-     #                         fill = list(value = 0))
-     #           start_date <- year(min(Data$date))
-     #           end_date <- year(max(Data$date))
-     #      }
-     #      
-     #      tryCatch({
-     #           GlobalData$split_Data_ts <- ts(Data$value, start = start_date, end = end_date, frequency = freq)
-     #           output$split_data_ts <- renderPrint({
-     #                GlobalData$split_Data_ts
-     #           })
-     #           showNotification(
-     #                ui = "Data has been converted to time-series",
-     #                type = "message",
-     #                duration = 5
-     #           )
-     #      }, error = function(e) {
-     #           output$split_data_ts <- renderPrint({
-     #                paste("Error:", e)
-     #           })
-     #           showNotification(
-     #                ui = "Data cannot be converted to time-series",
-     #                type = "error",
-     #                duration = 60
-     #           )
-     #      })
-     #      
-     #      # update date range
-     #      train_period <- round(nrow(Data) * 0.7)
-     #      test_period <- nrow(Data) - train_period
-     #      train_date <- Data$date[1:train_period]
-     #      test_date <- Data$date[(train_period + 1):nrow(Data)]
-     #      updateDateRangeInput(
-     #           session = session,
-     #           inputId = "train_date",
-     #           start = min(train_date),
-     #           end = max(train_date)
-     #      )
-     #      updateDateRangeInput(
-     #           session = session,
-     #           inputId = "test_date",
-     #           start = min(test_date),
-     #           end = max(test_date)
-     #      )
-     # })
-     # 
-     # observeEvent(input$train_model, {
-     #      Data <- GlobalData$split_Data
-     #      DataTS <- GlobalData$split_Data_ts
-     #      train_date <- as.Date(input$train_date)
-     #      test_date <- as.Date(input$test_date)
-     #      model_type <- input$model_type
-     #      
-     #      # check date range is legal
-     #      if (test_date[1] < train_date[2]) {
-     #           showNotification(
-     #                ui = "Test date should be later than train date",
-     #                type = "error",
-     #                duration = 60
-     #           )
-     #      } else {
-     #           train_id <- which(Data$date >= train_date[1] & Data$date <= train_date[2])
-     #           test_id <- which(Data$date >= test_date[1] & Data$date <= test_date[2])
-     #           all_id <- which(Data$date >= train_date[1] & Data$date <= test_date[2])
-     #           train_ts <- DataTS[train_id]
-     #           test_ts <- DataTS[test_id]
-     #           all_ts <- DataTS[all_id]
-     #           
-     #           outcome <- auto_select_function(train_ts, test_ts, all_ts, 0.1, model_type)
-     #           
-     #           output$model_info <- renderPrint({
-     #                paste("Model type:", paste(model_type, collapse = ", "))
-     #           })
-     #           
-     #           DataIndex <- get_norm_index(outcome[['goodness']])
-     #           output$model_data <- renderDT(DataIndex,
-     #                                         options = list(
-     #                                              pageLength = 10,
-     #                                              autoWidth = TRUE,
-     #                                              ordering = TRUE,
-     #                                              scrollX = TRUE,
-     #                                              scrollY = TRUE,
-     #                                              fixedColumns = TRUE,
-     #                                              searching = TRUE,
-     #                                              info = TRUE,
-     #                                              dom = "Bfrtip",
-     #                                              buttons = list(
-     #                                                   "copy",
-     #                                                   "csv",
-     #                                                   "excel",
-     #                                                   "pdf",
-     #                                                   "print"
-     #                                              )
-     #                                         ),
-     #                                         rownames = FALSE,
-     #                                         class = "display",
-     #                                         extensions = c("Buttons"))
-     #           
-     #           output$model_summary <- renderPrint({
-     #                DataIndex[DataIndex$Best == 1, 1:4]
-     #           })
-     #           
-     #           GlobalData$optimal_model <- as.character(DataIndex[DataIndex$Best == 1, 'Method'])
-     #           
-     #           # update forecast model
-     #           updateSelectInput(
-     #                session = session,
-     #                inputId = "set_model",
-     #                selected = GlobalData$optimal_model
-     #           )
-     #           updateDateRangeInput(
-     #                session = session,
-     #                inputId = "forecast_train",
-     #                start = min(train_date),
-     #                end = max(test_date)
-     #           )
-     #      }
-     # })
-     # 
-     # observeEvent(input$forecast_model, {
-     #      Data <- GlobalData$split_Data
-     #      DataTS <- GlobalData$split_Data_ts
-     #      train_date <- as.Date(input$forecast_train)
-     #      forecast_period <- input$forecast_period
-     #      model_type <- input$set_model
-     #      
-     #      train_id <- which(Data$date >= train_date[1] & Data$date <= train_date[2])
-     #      train_ts <- DataTS[train_id]
-     #      freq <- frequency(DataTS)
-     #      if (freq == 365.25) {
-     #           start_date <- c(year(train_date[1]), yday(train_date[1]))
-     #           end_date <- c(year(train_date[2]), yday(train_date[2]))
-     #      } else if (freq == 12) {
-     #           start_date <- c(year(train_date[1]), month(train_date[1]))
-     #           end_date <- c(year(train_date[2]), month(train_date[2]))
-     #      } else {
-     #           start_date <- year(train_date[1])
-     #           end_date <- year(train_date[2])
-     #      }
-     #      train_ts <- ts(train_ts, start = start_date, end = end_date, frequency = freq)
-     #      outcome <- auto_forecast_function(train_ts, forecast_period, 0.1, model_type)
-     #      
-     #      output$forecast_info <- renderPrint({
-     #           summary(outcome$mod)
-     #      })
-     #      GlobalData$forecast_data <- outcome$outcome_plot_2
-     #      
-     #      output$forecast_data <- renderDT(GlobalData$forecast_data,
-     #                                       options = list(
-     #                                            pageLength = 5,
-     #                                            autoWidth = TRUE,
-     #                                            ordering = TRUE,
-     #                                            scrollX = TRUE,
-     #                                            scrollY = TRUE,
-     #                                            fixedColumns = TRUE,
-     #                                            searching = TRUE,
-     #                                            info = TRUE,
-     #                                            dom = "Bfrtip",
-     #                                            buttons = list(
-     #                                                 "copy",
-     #                                                 "csv",
-     #                                                 "excel",
-     #                                                 "pdf",
-     #                                                 "print"
-     #                                            )
-     #                                       ),
-     #                                       rownames = FALSE,
-     #                                       class = "display",
-     #                                       extensions = c("Buttons"))
-     #      
-     #      output$forecast_plot <- renderPlot({
-     #           ggplot(GlobalData$split_Data) +
-     #                geom_line(
-     #                     mapping = aes(x = date,
-     #                                   y = value,
-     #                                   colour = "Observed"),
-     #                     linewidth = 0.7
-     #                ) +
-     #                geom_line(
-     #                     mapping = aes(x = date,
-     #                                   y = mean,
-     #                                   colour = "Forecasted"),
-     #                     linewidth = 0.7,
-     #                     data = outcome$outcome_plot_2
-     #                ) +
-     #                scale_x_date(
-     #                     expand = expansion(add = c(0, 0)),
-     #                     date_labels = "%Y"
-     #                ) +
-     #                scale_color_manual(values = c(
-     #                     Forecasted = "#E64B35FF",
-     #                     Observed = "#00A087FF"
-     #                )) +
-     #                theme_classic()+
-     #                theme(legend.position = "bottom") +
-     #                labs(
-     #                     x = 'Date',
-     #                     y = 'Value',
-     #                     color = ""
-     #                )
-     #      })
-     # })
+     observeEvent(input$start_estimate, {
+          Data <- GlobalData$data_filter
+          data_age_digits <- input$data_age_digits
+          
+          current_logs <- GlobalData$logs
+          new_log <- paste(Sys.time(), "- Start to estimate median age")
+          GlobalData$logs <- paste(current_logs, new_log, sep = "\n")
+          
+          # forwards to find median of each group
+          Data <- Data |> 
+               rowwise() |>
+               rename(Cases = val) |>
+               mutate(AgeList = if_else(is.na(StartAge), list(NA_real_),
+                                        list(seq(StartAge, EndAge, 10^(-input$data_age_digits))))) |> 
+               unnest(cols = c(AgeList)) |>
+               filter(!is.na(AgeList)) |>
+               group_by(location_name, year, AgeList) |>
+               mutate(AverageCases = Cases / ((EndAge - StartAge)*100 + 1)) |>
+               ungroup() |>
+               select(location_name, year, sex_name, Age = AgeList, AverageCases) |>
+               group_by(location_name, sex_name, year) |>
+               mutate(Weight = AverageCases / sum(AverageCases),
+                      Weight = case_when(is.na(Weight) ~ 0,
+                                         TRUE ~ Weight),
+                      cum_weight = cumsum(Weight)) |>
+               summarise(MedianAge = Age[min(which(cum_weight >= 0.5))],
+                         Q1 = Age[min(which(cum_weight >= 0.25))],
+                         Q3 = Age[min(which(cum_weight >= 0.75))],
+                         .groups = 'drop')
+          
+          GlobalData$data_median <- Data
+          
+          current_logs <- GlobalData$logs
+          new_log <- paste(Sys.time(), "- Estimate median age success")
+          GlobalData$logs <- paste(current_logs, new_log, sep = "\n")
+     })
+     
+     ## Plot -------------------------------------------------------------------
+     observeEvent(GlobalData$data_median,{
+          data_median_age <- GlobalData$data_median
+          
+          output$outcome_1 <- renderPlot({
+               ggplot(data_median_age)+
+                    geom_line(aes(x = year, y = MedianAge, color = sex_name))+
+                    geom_ribbon(aes(x = year, ymin = Q1, ymax = Q3, fill = sex_name), alpha = 0.5)+
+                    facet_wrap(.~location_name)+
+                    scale_y_continuous(limits = c(0, NA),
+                                       expand = expansion(mult = c(0, 0.3))) +
+                    theme_bw()+
+                    theme(plot.title.position = "plot",
+                          legend.direction = "vertical",
+                          legend.position = "bottom")+
+                    labs(x = "Year",
+                         y = "Median Age of Cases",
+                         fill = 'Sex',
+                         color = 'Sex')
+          })
+          
+          output$downloadData <- downloadHandler(
+               filename = function() {
+                    paste("median-age-", Sys.Date(), ".csv", sep="")
+               },
+               content = function(file) {
+                    write.csv(data_median_age, file)
+               }
+          )
+     })
 }
 
 # Run the Shiny app
