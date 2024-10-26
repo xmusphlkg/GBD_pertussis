@@ -1,0 +1,205 @@
+location_name,ISO2,ISO3
+American Samoa,AS,ASM
+Antigua and Barbuda,AG,ATG
+Arab Republic of Egypt,EG,EGY
+Argentine Republic,AR,ARG
+Australia,AU,AUS
+Barbados,BB,BRB
+Belize,BZ,BLZ
+Bermuda,BM,BMU
+Bolivarian Republic of Venezuela,VE,VEN
+Bosnia and Herzegovina,BA,BIH
+Brunei Darussalam,BN,BRN
+Burkina Faso,BF,BFA
+Canada,CA,CAN
+Central African Republic,CF,CAF
+Commonwealth of Dominica,DM,DMA
+Commonwealth of the Bahamas,BS,BHS
+Cook Islands,CK,COK
+Czech Republic,CZ,CZE
+Democratic People's Republic of Korea,KP,PRK
+Democratic Republic of Sao Tome and Principe,ST,STP
+Democratic Republic of Timor-Leste,TL,TLS
+Democratic Republic of the Congo,CD,COD
+Democratic Socialist Republic of Sri Lanka,LK,LKA
+Dominican Republic,DO,DOM
+Eastern Republic of Uruguay,UY,URY
+Federal Democratic Republic of Ethiopia,ET,ETH
+Federal Democratic Republic of Nepal,NP,NPL
+Federal Republic of Germany,DE,DEU
+Federal Republic of Nigeria,NG,NGA
+Federal Republic of Somalia,SO,SOM
+Federated States of Micronesia,FM,FSM
+Federative Republic of Brazil,BR,BRA
+French Republic,FR,FRA
+Gabonese Republic,GA,GAB
+Georgia,GE,GEO
+Grand Duchy of Luxembourg,LU,LUX
+Greenland,GL,GRL
+Grenada,GD,GRD
+Guam,GU,GUM
+Hashemite Kingdom of Jordan,JO,JOR
+Hellenic Republic,GR,GRC
+Hungary,HU,HUN
+Independent State of Papua New Guinea,PG,PNG
+Independent State of Samoa,WS,WSM
+Ireland,IE,IRL
+Islamic Republic of Afghanistan,AF,AFG
+Islamic Republic of Iran,IR,IRN
+Islamic Republic of Mauritania,MR,MRT
+Islamic Republic of Pakistan,PK,PAK
+Jamaica,JM,JAM
+Japan,JP,JPN
+Kingdom of Bahrain,BH,BHR
+Kingdom of Belgium,BE,BEL
+Kingdom of Bhutan,BT,BTN
+Kingdom of Cambodia,KH,KHM
+Kingdom of Denmark,DK,DNK
+Kingdom of Eswatini,SZ,SWZ
+Kingdom of Lesotho,LS,LSO
+Kingdom of Morocco,MA,MAR
+Kingdom of Norway,NO,NOR
+Kingdom of Saudi Arabia,SA,SAU
+Kingdom of Spain,ES,ESP
+Kingdom of Sweden,SE,SWE
+Kingdom of Thailand,TH,THA
+Kingdom of Tonga,TO,TON
+Kingdom of the Netherlands,NL,NLD
+Kyrgyz Republic,KG,KGZ
+Lao People's Democratic Republic,LA,LAO
+Lebanese Republic,LB,LBN
+Malaysia,MY,MYS
+Mongolia,MN,MNG
+Montenegro,ME,MNE
+New Zealand,NZ,NZL
+North Macedonia,MK,MKD
+Northern Mariana Islands,MP,MNP
+Palestine,PS,PSE
+People's Democratic Republic of Algeria,DZ,DZA
+People's Republic of Bangladesh,BD,BGD
+People's Republic of China,CN,CHN
+Plurinational State of Bolivia,BO,BOL
+Portuguese Republic,PT,PRT
+Principality of Andorra,AD,AND
+Principality of Monaco,MC,MCO
+Puerto Rico,PR,PRI
+Republic of Albania,AL,ALB
+Republic of Angola,AO,AGO
+Republic of Armenia,AM,ARM
+Republic of Austria,AT,AUT
+Republic of Azerbaijan,AZ,AZE
+Republic of Belarus,BY,BLR
+Republic of Benin,BJ,BEN
+Republic of Botswana,BW,BWA
+Republic of Bulgaria,BG,BGR
+Republic of Burundi,BI,BDI
+Republic of Cabo Verde,CV,CPV
+Republic of Cameroon,CM,CMR
+Republic of Chad,TD,TCD
+Republic of Chile,CL,CHL
+Republic of Colombia,CO,COL
+Republic of Costa Rica,CR,CRI
+Republic of Croatia,HR,HRV
+Republic of Cuba,CU,CUB
+Republic of Cyprus,CY,CYP
+Republic of Côte d'Ivoire,CI,CIV
+Republic of Djibouti,DJ,DJI
+Republic of Ecuador,EC,ECU
+Republic of El Salvador,SV,SLV
+Republic of Equatorial Guinea,GQ,GNQ
+Republic of Estonia,EE,EST
+Republic of Fiji,FJ,FJI
+Republic of Finland,FI,FIN
+Republic of Ghana,GH,GHA
+Republic of Guatemala,GT,GTM
+Republic of Guinea,GN,GIN
+Republic of Guinea-Bissau,GW,GNB
+Republic of Guyana,GY,GUY
+Republic of Haiti,HT,HTI
+Republic of Honduras,HN,HND
+Republic of Iceland,IS,ISL
+Republic of India,IN,IND
+Republic of Indonesia,ID,IDN
+Republic of Iraq,IQ,IRQ
+Republic of Italy,IT,ITA
+Republic of Kazakhstan,KZ,KAZ
+Republic of Kenya,KE,KEN
+Republic of Kiribati,KI,KIR
+Republic of Korea,KR,KOR
+Republic of Latvia,LV,LVA
+Republic of Liberia,LR,LBR
+Republic of Lithuania,LT,LTU
+Republic of Madagascar,MG,MDG
+Republic of Malawi,MW,MWI
+Republic of Maldives,MV,MDV
+Republic of Mali,ML,MLI
+Republic of Malta,MT,MLT
+Republic of Mauritius,MU,MUS
+Republic of Moldova,MD,MDA
+Republic of Mozambique,MZ,MOZ
+Republic of Namibia,NA,NAM
+Republic of Nauru,NR,NRU
+Republic of Nicaragua,NI,NIC
+Republic of Niue,NU,NIU
+Republic of Palau,PW,PLW
+Republic of Panama,PA,PAN
+Republic of Paraguay,PY,PRY
+Republic of Peru,PE,PER
+Republic of Poland,PL,POL
+Republic of Rwanda,RW,RWA
+Republic of San Marino,SM,SMR
+Republic of Senegal,SN,SEN
+Republic of Serbia,RS,SRB
+Republic of Seychelles,SC,SYC
+Republic of Sierra Leone,SL,SLE
+Republic of Singapore,SG,SGP
+Republic of Slovenia,SI,SVN
+Republic of South Africa,ZA,ZAF
+Republic of South Sudan,SS,SSD
+Republic of Sudan,SD,SDN
+Republic of Suriname,SR,SUR
+Republic of Tajikistan,TJ,TJK
+Republic of Trinidad and Tobago,TT,TTO
+Republic of Tunisia,TN,TUN
+Republic of Turkey,TR,TUR
+Republic of Uganda,UG,UGA
+Republic of Uzbekistan,UZ,UZB
+Republic of Vanuatu,VU,VUT
+Republic of Yemen,YE,YEM
+Republic of Zambia,ZM,ZMB
+Republic of Zimbabwe,ZW,ZWE
+Republic of the Congo,CG,COG
+Republic of the Gambia,GM,GMB
+Republic of the Marshall Islands,MH,MHL
+Republic of the Niger,NE,NER
+Republic of the Philippines,PH,PHL
+Republic of the Union of Myanmar,MM,MMR
+Romania,RO,ROU
+Russian Federation,RU,RUS
+Saint Kitts and Nevis,KN,KNA
+Saint Lucia,LC,LCA
+Saint Vincent and the Grenadines,VC,VCT
+Slovak Republic,SK,SVK
+Socialist Republic of Viet Nam,VN,VNM
+Solomon Islands,SB,SLB
+State of Eritrea,ER,ERI
+State of Israel,IL,ISR
+State of Kuwait,KW,KWT
+State of Libya,LY,LBY
+State of Qatar,QA,QAT
+Sultanate of Oman,OM,OMN
+Swiss Confederation,CH,CHE
+Syrian Arab Republic,SY,SYR
+Taiwan (Province of China),TW,TWN
+Togolese Republic,TG,TGO
+Tokelau,TK,TKL
+Turkmenistan,TM,TKM
+Tuvalu,TV,TUV
+Ukraine,UA,UKR
+Union of the Comoros,KM,COM
+United Arab Emirates,AE,ARE
+United Kingdom of Great Britain and Northern Ireland,GB,GBR
+United Mexican States,MX,MEX
+United Republic of Tanzania,TZ,TZA
+United States Virgin Islands,VI,VIR
+United States of America,US,USA
