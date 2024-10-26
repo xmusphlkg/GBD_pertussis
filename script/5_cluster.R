@@ -172,7 +172,7 @@ plot_year <- function(i, index){
                rename(value = as.character(y))
           breaks <- pretty(c(data_clean_incidence$`1990`, data_clean_incidence$`2019`, data_clean_incidence$`2021`), n = 10)
           limits <- range(breaks)
-          fill_colors <- paletteer_d("Redmonder::dPBIRdGn")
+          fill_colors <- rev(paletteer_d("Redmonder::dPBIRdGn"))
           l <- i*2+1
      } else {
           data <- data_clean_mortality |>
