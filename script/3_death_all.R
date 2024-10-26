@@ -126,7 +126,14 @@ data_panel_C <- data_raw_death |>
                                  age_name == "5-9 years" ~ "05-09",
                                  age_name == "10-14 years" ~ "10-14",
                                  age_name == "15-19 years" ~ "15-19",
-                                 TRUE ~ "20+"))
+                                 TRUE ~ "20+"),
+            # replace region name
+            location_name = case_when(location_name == "African Region" ~ "Africa",
+                                      location_name == "Region of the Americas" ~ "Americas",
+                                      location_name == "South-East Asia Region" ~ "South-East Asia",
+                                      location_name == "European Region" ~ "Europe",
+                                      location_name == "Eastern Mediterranean Region" ~ "Eastern Mediterranean",
+                                      location_name == "Western Pacific Region" ~ "Western Pacific"))
 
 plot_region <- function(i){
      data_panel_C |> 

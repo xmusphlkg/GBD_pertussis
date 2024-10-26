@@ -39,7 +39,14 @@ data_clean_death <- data_raw_death |>
      rename(Cases = val) |>
      group_by(location_name, year) |>
      mutate(Weight = Cases/sum(Cases),
-            CasesAll = sum(Cases)) |> 
+            CasesAll = sum(Cases),
+            # replace region name
+            location_name = case_when(location_name == "African Region" ~ "Africa",
+                                      location_name == "Region of the Americas" ~ "Americas",
+                                      location_name == "South-East Asia Region" ~ "South-East Asia",
+                                      location_name == "European Region" ~ "Europe",
+                                      location_name == "Eastern Mediterranean Region" ~ "Eastern Mediterranean",
+                                      location_name == "Western Pacific Region" ~ "Western Pacific")) |> 
      select(location_name, year, Age, StartAge, EndAge, MiddleAge, Cases, CasesAll, Weight) |> 
      arrange(location_name, year, MiddleAge)
 
@@ -73,8 +80,7 @@ data_median_age <- data_clean_death|>
                Q3 = Age[min(which(cum_weight >= 0.75))]/12,
                .groups = 'drop')
 
-locations <- c('Global', 'African Region', 'Eastern Mediterranean Region', 'European Region',
-               'Region of the Americas', 'South-East Asia Region', 'Western Pacific Region')
+locations <- c('Global', 'Africa', 'Americas', 'South-East Asia', 'Europe', 'Eastern Mediterranean', 'Western Pacific')
 fill_colors <- c(paletteer_d("MoMAColors::OKeeffe"), "#019875FF")
 names(fill_colors) <- locations
 
@@ -102,9 +108,9 @@ plot_fun <- function(i){
                 legend.position = "bottom")+
           labs(title = paste0(letters[i], ") ", location),
                x = "Year",
-               y = "Median Age of Cases",
-               fill = NULL,
-               color = NULL)
+               y = "Age of Deaths",
+               fill = "Median (Q1, Q3)",
+               color = "Median (Q1, Q3)")
 }
 
 outcome <- lapply(1:length(locations), plot_fun)
@@ -124,14 +130,28 @@ data_map <- st_read("./data/world.zh.json") |>
 data_map_iso <- read.csv('./data/iso_code.csv')
 
 data_death_1990 <- read.csv('./data/preparedata/Country_1990.csv') |> 
-     filter(measure_name == "Deaths" & year == 1990) |>
-     select(location_name, year, age_name, val)
+     filter(measure_name == "Deaths" & year == 1990)
+data_death_2019 <- read.csv('./data/preparedata/Country_2019.csv') |> 
+     filter(measure_name == "Deaths" & year == 2019)
 data_death_2021 <- read.csv('./data/preparedata/Country_2021.csv') |> 
-     filter(measure_name == "Deaths" & year == 2021) |>
-     select(location_name, year, age_name, val)
-data_death <- rbind(data_death_1990, data_death_2021)
+     filter(measure_name == "Deaths" & year == 2021)
+data_death <- rbind(data_death_1990, data_death_2019, data_death_2021) |> 
+     select(location_id, location_name, year, age_name, val)
 
-remove(data_death_1990, data_death_2021)
+remove(data_death_1990, data_death_2019, data_death_2021)
+
+# check all locations in map data
+data_location <- data_death |> 
+     filter(year == 2021) |>
+     select(location_id, location_name) |> 
+     unique() |> 
+     arrange(location_id)
+
+# using newest location name
+data_death <- data_death |> 
+     left_join(data_location, by = "location_id") |> 
+     select(-location_name.x) |> 
+     rename(location_name = location_name.y)
 
 # find all countries, year with 0 cases
 data_death_zero <- data_death |> 
@@ -188,14 +208,14 @@ data_median_age <- data_death |>
      summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
                .groups = 'drop')
 
-panel_h <- data_median_age
+panel_h_l <- data_median_age
 
 data_median_diff <- data_median_age |> 
      pivot_wider(names_from = year, values_from = MedianAge) |>
-     mutate(Diff = `2021` - `1990`) |> 
-     left_join(data_map_iso, by = c("location_name" = "location_name"))
-
-panel_g <- data_median_diff
+     mutate(Diff1 = `2019` - `1990`,
+            Diff2 = `2021` - `1990`) |>
+     left_join(data_map_iso, by = c("location_name" = "location_name")) |> 
+     select(ISO3, location_name, `1990`, Diff1, `2019`, Diff2, `2021`)
 
 ## check all locations in map data
 data_median_diff[!data_median_diff$ISO3 %in% data_map$iso_a3, ]
@@ -204,78 +224,71 @@ data_median_diff[!data_median_diff$ISO3 %in% data_map$iso_a3, ]
 data_map_year <- data_map |> 
      left_join(data_median_diff, by = c("iso_a3" = "ISO3"))
 
-fig2 <- ggplot(data = data_map_year) +
-     geom_sf(aes(fill = `2021`)) +
-     # add x, y tick labels
-     theme(axis.text.x = element_text(size = 8),
-           axis.text.y = element_text(size = 8)) +
-     scale_x_continuous(limits = c(-180, 180),
-                        expand = c(0, 0)) + 
-     scale_y_continuous(limits = c(-60, 75)) +
-     scale_fill_gradientn(colours = paletteer_d("Redmonder::dPBIRdGn"),
-                          limits = c(0, 3.5),
-                          breaks = seq(0, 3.5, 0.5),
-                          na.value = 'grey50')+
-     theme_bw() +
-     theme(panel.grid = element_blank(),
-           panel.background = element_rect(fill = "#5A98BF50", color = NA),
-           axis.text = element_text(color = 'black', face = 'plain'),
-           axis.title = element_text(color = 'black', face = 'plain'),
-           plot.title.position = 'plot',
-           legend.position = 'bottom')+
-     guides(fill = guide_colorbar(barwidth = 20,
-                                  title.position = 'top',
-                                  barheight = 1)) +
-     labs(title = paste0(letters[length(locations) + 1], ")"),
-          x = NULL,
-          y = NULL,
-          fill = 'Median age of deaths in 2021')
+plot_map <- function(i){
+     value <- names(data_median_diff)[i+2]
+     data <- data_map_year |> 
+          select(location_name, geometry, all_of(value)) |> 
+          rename(`value` = value)
+     
+     if (str_detect(value, "Diff")){
+          fill_colors <- c("#CAA5C2FF", "#DBC3D6FF", "#F5F5F5FF", "#FFD5C2FF", "#FEC0A3FF", "#FEAB85FF", "#BF714DFF", "#7F4B33FF")
+          breaks <- pretty(c(data_median_diff$Diff1, data_median_diff$Diff2), n = 10)
+          limits <- range(breaks)
+     } else {
+          fill_colors <- paletteer_d("Redmonder::dPBIRdGn")
+          breaks <- pretty(c(data_median_diff$`1990`, data_median_diff$`2019`, data_median_diff$`2021`), n = 10)
+          limits <- range(breaks)
+     }
+     
+     ggplot(data = data) +
+          geom_sf(aes(fill = value)) +
+          # add x, y tick labels
+          theme(axis.text.x = element_text(size = 8),
+                axis.text.y = element_text(size = 8)) +
+          scale_x_continuous(limits = c(-180, 180),
+                             expand = c(0, 0)) + 
+          scale_y_continuous(limits = c(-60, 75)) +
+          scale_fill_gradientn(colours = fill_colors,
+                               limits = limits,
+                               breaks = breaks,
+                               na.value = 'grey50')+
+          theme_bw() +
+          theme(panel.grid = element_blank(),
+                panel.background = element_rect(fill = "#5A98BF50", color = NA),
+                axis.text = element_text(color = 'black', face = 'plain'),
+                axis.title = element_text(color = 'black', face = 'plain'),
+                plot.title.position = 'plot',
+                legend.position = 'bottom')+
+          guides(fill = guide_colorbar(barwidth = 20,
+                                       title.position = 'top',
+                                       barheight = 1)) +
+          labs(title = paste0(letters[i+7], ") "),
+               x = NULL,
+               y = NULL,
+               fill = ifelse(str_detect(value, "Diff"),
+                             'Difference of median age',
+                             'Median age of deaths'))
+}
 
-## create map plot for diff
-fill_colors <- paletteer_d("Redmonder::dPBIPuOr")
+fig2 <- lapply(1:5, plot_map)
+fig2[[6]] <- guide_area()
 
-fig3 <- ggplot(data = data_map_year) +
-     geom_sf(aes(fill = Diff)) +
-     # add x, y tick labels
-     theme(axis.text.x = element_text(size = 8),
-           axis.text.y = element_text(size = 8)) +
-     scale_x_continuous(limits = c(-180, 180),
-                        expand = c(0, 0)) +
-     scale_y_continuous(limits = c(-60, 75)) +
-     scale_fill_gradientn(colours = fill_colors,
-                          limits = c(-0.8, 2),
-                          breaks = seq(-0.8, 2, 0.4),
-                          na.value = 'grey50')+
-     theme_bw() +
-     theme(panel.grid = element_blank(),
-           panel.background = element_rect(fill = "#5A98BF50", color = NA),
-           axis.text = element_text(color = 'black', face = 'plain'),
-           axis.title = element_text(color = 'black', face = 'plain'),
-           plot.title.position = 'plot',
-           legend.position = 'bottom')+
-     guides(fill = guide_colorbar(barwidth = 20,
-                                  title.position = 'top',
-                                  barheight = 1)) +
-     labs(title = paste0(letters[length(locations) + 2], ")"),
-          x = NULL,
-          y = NULL,
-          fill = 'Difference of median age between 2021 and 1990')
+fig2 <- wrap_plots(fig2, ncol = 2) + plot_layout(guides = "collect")
 
 # save --------------------------------------------------------------------
 
 fig <- cowplot::plot_grid(fig1,
-                          fig2 | fig3,
+                          fig2,
                           nrow = 2,
-                          rel_heights = c(1, 0.7))
+                          rel_heights = c(1.1, 1.8))
 
 ggsave(filename = "outcome/fig4.pdf",
        plot = fig,
        width = 10,
-       height = 8.5,
+       height = 12,
        device = cairo_pdf,
        family = "Arial")
 
 
-write.xlsx(list(panel_a_g = panel_a_g, panel_h = panel_h, panel_g = panel_g),
-           file = "outcome/fig4.xlsx",
-           rowNames = FALSE)
+write.xlsx(list(panel_a_g = panel_a_g, panel_h_l = panel_h_l),
+           "outcome/fig2.xlsx", rowNames = FALSE)
