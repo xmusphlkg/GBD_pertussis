@@ -46,7 +46,8 @@ data_clean_death <- data_raw_death |>
                                       location_name == "South-East Asia Region" ~ "South-East Asia",
                                       location_name == "European Region" ~ "Europe",
                                       location_name == "Eastern Mediterranean Region" ~ "Eastern Mediterranean",
-                                      location_name == "Western Pacific Region" ~ "Western Pacific")) |> 
+                                      location_name == "Western Pacific Region" ~ "Western Pacific",
+                                      TRUE ~ location_name)) |>
      select(location_name, year, Age, StartAge, EndAge, MiddleAge, Cases, CasesAll, Weight) |> 
      arrange(location_name, year, MiddleAge)
 
@@ -291,4 +292,4 @@ ggsave(filename = "outcome/fig4.pdf",
 
 
 write.xlsx(list(panel_a_g = panel_a_g, panel_h_l = panel_h_l),
-           "outcome/fig2.xlsx", rowNames = FALSE)
+           "outcome/fig4.xlsx", rowNames = FALSE)
