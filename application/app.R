@@ -11,7 +11,7 @@ library(stringr)
 library(openxlsx)
 library(datamods)
 
-load("data.RData")
+load(".RData")
 
 # Define UI
 ui <- fluidPage(
@@ -154,6 +154,8 @@ ui <- fluidPage(
 
 # Define server
 server <- function(input, output, session) {
+     
+     load(".RData")
      
      # global values
      GlobalData <- reactiveValues(

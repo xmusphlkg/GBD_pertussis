@@ -4,6 +4,7 @@ library(paletteer)
 library(patchwork)
 library(nih.joinpoint)
 library(Cairo)
+library(openxlsx)
 
 # join point setting
 run_opt = run_options(model="ln",
@@ -167,3 +168,8 @@ ggsave(filename = "outcome/fig1.pdf",
        height = 9,
        device = cairo_pdf,
        family = "Arial")
+
+write.xlsx(list(data_panel_A, data_panel_B, data_panel_C),
+           file = "outcome/fig1.xlsx",
+           asTable = TRUE,
+           rowNames = FALSE)

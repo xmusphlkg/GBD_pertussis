@@ -165,3 +165,10 @@ ggsave(filename = "outcome/fig3.pdf",
        height = 9,
        device = cairo_pdf,
        family = "Arial")
+
+
+
+write.xlsx(list(data_panel_A, data_panel_B, data_panel_C),
+           file = "outcome/fig3.xlsx",
+           asTable = TRUE,
+           rowNames = FALSE)
