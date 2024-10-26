@@ -81,7 +81,7 @@ data_median_age <- data_clean_death|>
                Q3 = Age[min(which(cum_weight >= 0.75))]/12,
                .groups = 'drop')
 
-locations <- c('Global', 'Africa', 'Americas', 'South-East Asia', 'Europe', 'Eastern Mediterranean', 'Western Pacific')
+locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
 fill_colors <- c(paletteer_d("MoMAColors::OKeeffe"), "#019875FF")
 names(fill_colors) <- locations
 
@@ -216,7 +216,7 @@ data_median_diff <- data_median_age |>
      mutate(Diff1 = `2019` - `1990`,
             Diff2 = `2021` - `1990`) |>
      left_join(data_map_iso, by = c("location_name" = "location_name")) |> 
-     select(ISO3, location_name, `1990`, Diff1, `2019`, Diff2, `2021`)
+     select(ISO3, location_name, `1990`, `2019`, Diff1, `2021`, Diff2)
 
 ## check all locations in map data
 data_median_diff[!data_median_diff$ISO3 %in% data_map$iso_a3, ]
@@ -272,7 +272,7 @@ plot_map <- function(i){
 }
 
 fig2 <- lapply(1:5, plot_map)
-fig2[[6]] <- guide_area()
+fig2 <- list(fig2[[1]], guide_area(), fig2[[2]], fig2[[3]], fig2[[4]], fig2[[5]])
 
 fig2 <- wrap_plots(fig2, ncol = 2) + plot_layout(guides = "collect")
 
