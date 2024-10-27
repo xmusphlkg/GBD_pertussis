@@ -8,7 +8,7 @@ library(openxlsx)
 
 # loading data ------------------------------------------------------------
 
-data_raw_case <- read.csv('./data/preparedata/Age_group.csv')
+data_raw_case <- read.csv('./data/preparedata/Region_age.csv')
 
 # filter data with incidence, number, and year >= 1990
 data_raw_case <- data_raw_case |> 
@@ -156,13 +156,11 @@ data_incidence <- data_incidence |>
      select(-location_name.x) |> 
      rename(location_name = location_name.y)
 
-remove(data_location)
-
 # find all countries, year with 0 cases
 data_incidence_zero <- data_incidence |> 
      group_by(location_name, year) |> 
-     summarise(AllDeaths = round(sum(val)),
-               All = AllDeaths >= 40,
+     summarise(AllCases = round(sum(val)),
+               All = AllCases >= 40,
                .groups = 'drop')
 
 ## estimate median age
@@ -196,6 +194,8 @@ data_incidence <- data_incidence |>
      select(location_name, year, Age, StartAge, EndAge, MiddleAge, Cases, CasesAll, Weight) |> 
      arrange(location_name, year, MiddleAge)
 
+data_location$location_name[!data_location$location_name %in% unique(data_incidence$location_name)]
+
 data_median_age <- data_incidence |> 
      rowwise() |>
      mutate(AgeList = if_else(is.na(StartAge), list(NA_real_), list(seq(StartAge, EndAge, 0.1))) ) |>
@@ -211,6 +211,8 @@ data_median_age <- data_incidence |>
                                TRUE ~ Weight),
             cum_weight = cumsum(Weight)) |>
      summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
+               Q1 = Age[min(which(cum_weight >= 0.25))]/12,
+               Q3 = Age[min(which(cum_weight >= 0.75))]/12,
                .groups = 'drop')
 
 data_median_diff <- data_median_age |> 

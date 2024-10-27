@@ -4,6 +4,7 @@ library(paletteer)
 library(patchwork)
 library(nih.joinpoint)
 library(Cairo)
+library(openxlsx)
 
 # join point setting
 run_opt = run_options(model="ln",
@@ -15,25 +16,53 @@ export_opt = export_options()
 
 # loading data ------------------------------------------------------------
 
-data_list_death <- list.files(path = "data/preparedata/",
-                              pattern = "GBD",
-                              full.names = TRUE)
+data_global <- read.csv('./data/preparedata/Region_age.csv')
 
-data_raw_death <- data_list_death |> 
-     map_dfr(read.csv)
+data_global <- data_global |> 
+     filter(age_name %in% c('<28 days', '1-5 months', '6-11 months', '12-23 months', '2-4 years',
+                            '5-9 years', '10-14 years', '15-19 years', '20-24 years', '25-29 years',
+                            '30-34 years', '35-39 years', '40-44 years', '45-49 years', '50-54 years',
+                            '55-59 years', '60-64 years', '65-69 years', '70-74 years', '75-79 years',
+                            '80-84 years', '85-89 years', '90-94 years', '95+ years', 'All ages') &
+                 year >= 1990 &
+                 measure_name == "Deaths")
 
-data_raw_death <- data_raw_death |> 
-     filter(measure_name == "Deaths" & year >= 1990) |>
+# trend data for global incidence
+data_trend <- data_global |> 
+     filter(location_name == "Global" & age_name == "All ages") |>
      select(location_id, location_name, sex_name, age_name, year, metric_name, val, upper, lower) |> 
-     filter(metric_name %in% c("Number", "Rate"))
+     filter(metric_name %in% c("Number", "Rate")) |> 
+     arrange(year)
 
+data_trend_number <- data_trend |> 
+     filter(metric_name == "Number") |> 
+     select(year, val, lower, upper)
+
+data_trend_rate <- data_trend |>
+     filter(metric_name == "Rate") |> 
+     select(year, val, lower, upper)
+
+cat("Global deaths: ", sum(data_trend_number$val), "\n")
+
+# age group trend data for global incidence
+data_adult <- data_global |> 
+     filter(location_name == "Global" & metric_name == "Number" & age_name != "All ages") |>
+     select(location_id, location_name, sex_name, age_name, year, metric_name, val) |> 
+     mutate(adult = !age_name %in% c('<28 days', '1-5 months', '6-11 months', '12-23 months', '2-4 years',
+                                     '5-9 years', '10-14 years', '15-19 years')) |> 
+     group_by(adult) |> 
+     summarise(val = sum(val),
+               .groups = "drop")
+
+cat("Adult incidence: ", data_adult$val[data_adult$adult == TRUE],
+    data_adult$val[data_adult$adult == TRUE]/sum(data_adult$val), "\n")
+
+cat("Child incidence: ", data_adult$val[data_adult$adult == FALSE],
+    data_adult$val[data_adult$adult == FALSE]/sum(data_adult$val), "\n")
 
 # panel A -----------------------------------------------------------------
 
-data_panel_A <- data_raw_death |> 
-     filter(metric_name == "Rate" & age_name == "All ages" & location_name == "Global") |> 
-     select(year, val, upper, lower) |> 
-     arrange(year)
+data_panel_A <- data_trend_rate
 
 jp_model <- joinpoint(data_panel_A,
                       year,
@@ -47,6 +76,19 @@ data_panel_A <- data_panel_A |>
             stage = case_when(year >= jp_apc$segment_start[1] & year < jp_apc$segment_end[1] ~ 1,
                               year >= jp_apc$segment_start[2] & year < jp_apc$segment_end[2] ~ 2,
                               TRUE ~ 0))
+
+cat("Joinpoint APC for mortality rate: ", jp_apc$apc, "\n")
+print(jp_apc)
+
+cat("Joinpoint for mortality rate: ", "\n")
+print(data_panel_A[data_panel_A$year %in% c(jp_apc$segment_start, jp_apc$segment_end),])
+
+cat("Joinpoint for deaths: ", "\n")
+print(data_trend_number[data_trend_number$year %in% c(jp_apc$segment_start, jp_apc$segment_end),])
+
+cat("Decrease in deaths: ", data_trend_number$val[data_trend_number$year == 2021] - data_trend_number$val[data_trend_number$year == 1990],
+    (data_trend_number$val[data_trend_number$year == 2021] - data_trend_number$val[data_trend_number$year == 1990])/data_trend_number$val[data_trend_number$year == 1990],
+    "\n")
 
 fig1 <- ggplot(data_panel_A, aes(x = year, y = val, group = 'A')) +
      geom_point(mapping = aes(color = 'death')) +
@@ -76,17 +118,19 @@ fig1 <- ggplot(data_panel_A, aes(x = year, y = val, group = 'A')) +
 
 # panel B -----------------------------------------------------------------
 
-data_panel_B <- data_raw_death |> 
+data_panel_B <- data_global |> 
      filter(location_name == "Global" & metric_name == "Number" & age_name != "All ages") |>
+     mutate(age_name = case_when(age_name %in% c('<28 days', '1-5 months', '6-11 months') ~ "[0,1)",
+                                 age_name %in% c('12-23 months') ~ "[1,2)",
+                                 age_name %in% c('2-4 years', '5-9 years') ~ "[2,9)",
+                                 age_name %in% c('10-14 years', '15-19 years') ~ "[10,19)",
+                                 TRUE ~ "[20,)"),
+            age_name = factor(age_name, levels = c("[0,1)", "[1,2)", "[2,9)", "[10,19)", "[20,)"))) |>
      group_by(year, age_name) |> 
      summarise(val = sum(val),
                .groups = "drop") |> 
-     mutate(age_name = case_when(age_name == "<1 year" ~ "<01",
-                                 age_name == "2-4 years" ~ "02-04",
-                                 age_name == "5-9 years" ~ "05-09",
-                                 age_name == "10-14 years" ~ "10-14",
-                                 age_name == "15-19 years" ~ "15-19",
-                                 TRUE ~ "20+"))
+     group_by(year) |> 
+     mutate(val = val/sum(val))
 
 fill_colors <- paletteer_d("MoMAColors::OKeeffe")
 
@@ -110,37 +154,48 @@ fig2 <- ggplot(data_panel_B, aes(x = year, y = val, fill = age_name)) +
 
 # panel C -----------------------------------------------------------------
 
-data_panel_C <- data_raw_death |> 
-     filter(metric_name == "Number" & age_name != "All ages" &
-                 location_name %in% c("African Region",
-                                      "Region of the Americas",
-                                      "South-East Asia Region",
-                                      "European Region",
-                                      "Eastern Mediterranean Region",
-                                      "Western Pacific Region")) |>
-     group_by(location_name, year, age_name) |> 
-     summarise(val = sum(val),
-               .groups = "drop") |> 
-     mutate(age_name = case_when(age_name == "<1 year" ~ "<01",
-                                 age_name == "2-4 years" ~ "02-04",
-                                 age_name == "5-9 years" ~ "05-09",
-                                 age_name == "10-14 years" ~ "10-14",
-                                 age_name == "15-19 years" ~ "15-19",
-                                 TRUE ~ "20+"),
+data_panel_C <- data_global |> 
+     filter(location_name != "Global" & metric_name == "Number" & age_name != "All ages") |> 
+     mutate(age_name = case_when(age_name %in% c('<28 days', '1-5 months', '6-11 months') ~ "[0,1)",
+                                 age_name %in% c('12-23 months') ~ "[1,2)",
+                                 age_name %in% c('2-4 years', '5-9 years') ~ "[2,9)",
+                                 age_name %in% c('10-14 years', '15-19 years') ~ "[10,19)",
+                                 TRUE ~ "[20,)"),
+            age_name = factor(age_name, levels = c("[0,1)", "[1,2)", "[2,9)", "[10,19)", "[20,)")),
             # replace region name
             location_name = case_when(location_name == "African Region" ~ "Africa",
                                       location_name == "Region of the Americas" ~ "Americas",
                                       location_name == "South-East Asia Region" ~ "South-East Asia",
                                       location_name == "European Region" ~ "Europe",
                                       location_name == "Eastern Mediterranean Region" ~ "Eastern Mediterranean",
-                                      location_name == "Western Pacific Region" ~ "Western Pacific"))
+                                      location_name == "Western Pacific Region" ~ "Western Pacific")) |> 
+     group_by(location_name, year, age_name) |> 
+     summarise(val = sum(val),
+               .groups = "drop") |>
+     group_by(location_name, year) |>
+     mutate(val_prop = round(100 * val/sum(val), 2))
+
+data_sum <- data_panel_C |> 
+     filter(year %in% c(1990, 2021)) |> 
+     pivot_wider(id_cols = c("location_name", "age_name"),
+                 names_from = "year",
+                 values_from = "val_prop") |> 
+     mutate(diff = `2021` - `1990`)
+
+data_sum <- data_panel_C |> 
+     pivot_wider(id_cols = c("location_name", "age_name"),
+                 names_from = "year",
+                 values_from = "val_prop") |> 
+     arrange(location_name, age_name)
+
+locations <- c('Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
 
 plot_region <- function(i){
      data_panel_C |> 
-          filter(location_name == unique(data_panel_C$location_name)[i]) |> 
+          filter(location_name == locations[i]) |> 
           ggplot(aes(x = year, y = val, fill = age_name)) +
           geom_col(position = "fill") +
-          geom_hline(yintercept = c(0.5, 0.25), linetype = "dashed", color = "black") +
+          geom_hline(yintercept = 0.5, linetype = "dashed", color = "black") +
           scale_x_continuous(breaks = seq(1990, 2021, 5),
                              expand = c(0, 0)) +
           scale_y_continuous(labels = scales::percent_format(accuracy = 1),
@@ -149,14 +204,14 @@ plot_region <- function(i){
           theme_bw()+
           theme(plot.title.position = "plot",
                 legend.position = "bottom")+
-          labs(title = paste0(letters[i+2], ") ", unique(data_panel_C$location_name)[i]), 
+          labs(title = paste0(letters[i+2], ") ", locations[i]), 
                x = "Year",
                y = "death rate, per 100,000",
                fill = "Age group, years")+
           guides(fill = guide_legend(nrow = 1))
 }
 
-fig3 <- lapply(1:length(unique(data_panel_C$location_name)), plot_region) |> 
+fig3 <- lapply(1:length(locations), plot_region) |> 
      wrap_plots(nrow = 2, guides = "collect")&
      theme(legend.position = "bottom")
 
