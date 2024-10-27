@@ -151,7 +151,9 @@ plot_cluster <- function(i){
                 axis.text = element_text(color = 'black', face = 'plain'),
                 axis.title = element_text(color = 'black', face = 'plain'),
                 plot.title.position = 'plot',
-                legend.position = "bottom")+
+                legend.background = element_rect(fill = NA, color = NA),
+                legend.position = c(0, 0),
+                legend.justification = c(0, 0))+
           labs(title = paste0(letters[i], ") "),
                x = NULL,
                y = NULL,
@@ -227,12 +229,12 @@ fig3 <- lapply(1:3, plot_year, index = 'mortality') |>
 
 fig <- cowplot::plot_grid(fig1,
                           fig2 | fig3,
-                          ncol = 1, rel_heights = c(0.6, 1.6))
+                          ncol = 1, rel_heights = c(0.5, 1.6))
 
 ggsave(filename = "outcome/fig5.pdf",
        plot = fig,
        width = 10,
-       height = 11.4,
+       height = 11,
        device = cairo_pdf,
        family = "Arial")
 
