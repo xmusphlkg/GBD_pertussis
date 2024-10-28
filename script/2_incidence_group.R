@@ -288,7 +288,7 @@ plot_map <- function(i){
           labs(title = paste0(letters[i+7], ") "),
                x = NULL,
                y = NULL,
-               fill = ifelse(str_detect(value, "Diff"),
+               fill = ifelse(str_detect(y, "Diff"),
                              'Difference of median age',
                              'Median age of cases'))
 }
