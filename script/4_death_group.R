@@ -5,9 +5,29 @@ library(patchwork)
 library(Cairo)
 library(sf)
 library(openxlsx)
+library(parallel)
+
+# define gaussian kernel
+gaussian_kernel <- function(x, mu, sigma) {
+     exp(-0.5 * ((x - mu) / sigma)^2) / (sigma * sqrt(2 * pi))
+}
+
+get_weights <- function(data, locat){
+     data |>
+          filter(location_name == locat) |>
+          group_by(year) |>
+          mutate(Width = EndAge - StartAge,
+                 WeightedCases = ifelse(AverageCases > 0, 
+                                        sapply(Age, function(age) {
+                                             weights <- gaussian_kernel(Age, age, Width) 
+                                             sum(weights * AverageCases) / sum(weights)
+                                        }),
+                                        0)) |>
+          mutate(Weight = WeightedCases / sum(WeightedCases),
+                 cum_weight = cumsum(Weight))
+}
 
 # loading data ------------------------------------------------------------
-
 data_raw_death <- read.csv('./data/preparedata/Region_age.csv')
 
 data_raw_death <- data_raw_death |> 
@@ -58,15 +78,11 @@ data_clean_age <- data_clean_death |>
      unique() |> 
      arrange(MiddleAge)
 
-# Main --------------------------------------------------------------------
+locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
 
-# define gaussian kernel
-gaussian_kernel <- function(x, mu, sigma) {
-     exp(-0.5 * ((x - mu) / sigma)^2) / (sigma * sqrt(2 * pi))
-}
+# estimate median age -----------------------------------------------------
 
 # get median age of each location
-
 data_median_age <- data_clean_death|>
      rowwise() |>
      mutate(AgeList = if_else(is.na(StartAge),
@@ -77,23 +93,33 @@ data_median_age <- data_clean_death|>
      group_by(location_name, year, AgeList) |>
      mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
-     group_by(location_name, year) |>
-        mutate(Width = EndAge - StartAge,
-               WeightedCases = ifelse(AverageCases > 0, 
-                                      sapply(Age, function(age) {
-                                              weights <- gaussian_kernel(Age, age, Width) 
-                                              sum(weights * AverageCases) / sum(weights)
-                                      }),
-                                      0)) |>
-     mutate(Weight = WeightedCases / sum(WeightedCases),
-            cum_weight = cumsum(Weight)) |>
-     summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
-               Q1 = Age[min(which(cum_weight >= 0.25))]/12,
-               Q3 = Age[min(which(cum_weight >= 0.75))]/12,
-               .groups = 'drop')
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge)
 
-locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
+# make cluster for parallel computing
+cl_death <- makeCluster(length(locations))
+
+# setting up parallel computing
+clusterExport(cl_death, c("data_median_age", "locations", "get_weights", "gaussian_kernel"))
+
+# calculate median age for each location
+data_median_age <- parLapply(cl_death, locations, function(locat){
+     library(dplyr)
+     
+     get_weights(data_median_age, locat) |>
+          group_by(location_name, year) |>
+          summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
+                    Q1 = Age[min(which(cum_weight >= 0.25))]/12,
+                    Q3 = Age[min(which(cum_weight >= 0.75))]/12,
+                    .groups = 'drop')
+})
+
+data_median_age <- do.call(rbind, data_median_age)
+
+# stop cluster
+stopCluster(cl_death)
+
+# visualize median age ----------------------------------------------------
+
 fill_colors <- c(paletteer_d("MoMAColors::OKeeffe"), "#019875FF")
 names(fill_colors) <- locations
 
@@ -135,7 +161,7 @@ fig1 <- wrap_plots(outcome, ncol = 4) + plot_layout(guides = "collect")
 
 panel_a_g <- data_median_age
 
-# map ---------------------------------------------------------------------
+# loading map data --------------------------------------------------------
 
 ## loading data
 data_map <- st_read("./data/world.zh.json") |> 
@@ -172,6 +198,8 @@ data_death_zero <- data_death |>
      summarise(AllDeaths = round(sum(val)),
                All = AllDeaths >= 40,
                .groups = 'drop')
+
+# estimate national median age --------------------------------------------
 
 ## estimate median age
 data_death <- data_death |> 
@@ -212,20 +240,34 @@ data_median_age <- data_death |>
      group_by(location_name, year, AgeList) |>
      mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
-     group_by(location_name, year) |>
-        mutate(Width = EndAge - StartAge,
-               WeightedCases = ifelse(AverageCases > 0, 
-                                      sapply(Age, function(age) {
-                                              weights <- gaussian_kernel(Age, age, Width) 
-                                              sum(weights * AverageCases) / sum(weights)
-                                      }),
-                                      0)) |>
-     mutate(Weight = WeightedCases / sum(WeightedCases),
-            cum_weight = cumsum(Weight)) |>
-     summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
-               .groups = 'drop')
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge)
 
+locations <- unique(data_median_age$location_name)
+
+# make cluster for parallel computing
+cl_death <- makeCluster(40)
+
+# setting up parallel computing
+clusterExport(cl_death, c("data_median_age", "locations", "get_weights", "gaussian_kernel"))
+
+# calculate median age for each location
+data_median_age <- parLapply(cl_death, locations, function(locat){
+     library(dplyr)
+     
+     get_weights(data_median_age, locat) |>
+          group_by(location_name, year) |>
+          summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
+                    Q1 = Age[min(which(cum_weight >= 0.25))]/12,
+                    Q3 = Age[min(which(cum_weight >= 0.75))]/12,
+                    .groups = 'drop')
+})
+
+data_median_age <- do.call(rbind, data_median_age)
+
+# stop cluster
+stopCluster(cl_death)
+
+# visualize median age ----------------------------------------------------
 panel_h_l <- data_median_age
 
 data_median_diff <- data_median_age |> 

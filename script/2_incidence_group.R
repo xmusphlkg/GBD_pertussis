@@ -5,6 +5,27 @@ library(patchwork)
 library(Cairo)
 library(sf)
 library(openxlsx)
+library(parallel)
+
+# define gaussian kernel
+gaussian_kernel <- function(x, mu, sigma) {
+     exp(-0.5 * ((x - mu) / sigma)^2) / (sigma * sqrt(2 * pi))
+}
+
+get_weights <- function(data, locat){
+      data |>
+          filter(location_name == locat) |>
+          group_by(year) |>
+          mutate(Width = EndAge - StartAge,
+                 WeightedCases = ifelse(AverageCases > 0, 
+                                        sapply(Age, function(age) {
+                                             weights <- gaussian_kernel(Age, age, Width) 
+                                             sum(weights * AverageCases) / sum(weights)
+                                        }),
+                                        0)) |>
+          mutate(Weight = WeightedCases / sum(WeightedCases),
+                 cum_weight = cumsum(Weight))
+}
 
 # loading data ------------------------------------------------------------
 
@@ -60,12 +81,10 @@ data_clean_age <- data_clean_case |>
      unique() |> 
      arrange(MiddleAge)
 
-# Main --------------------------------------------------------------------
+locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
 
-# define gaussian kernel
-gaussian_kernel <- function(x, mu, sigma) {
-     exp(-0.5 * ((x - mu) / sigma)^2) / (sigma * sqrt(2 * pi))
-}
+
+# estimate median ---------------------------------------------------------
 
 # Get median age of each location
 data_median_age <- data_clean_case |> 
@@ -76,23 +95,32 @@ data_median_age <- data_clean_case |>
      group_by(location_name, year, AgeList) |>
      mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
-     group_by(location_name, year) |>
-        mutate(Width = EndAge - StartAge,
-               WeightedCases = ifelse(AverageCases > 0, 
-                                      sapply(Age, function(age) {
-                                              weights <- gaussian_kernel(Age, age, Width) 
-                                              sum(weights * AverageCases) / sum(weights)
-                                      }),
-                                      0)) |>
-     mutate(Weight = WeightedCases / sum(WeightedCases),
-            cum_weight = cumsum(Weight)) |>
-     summarise(MedianAge = Age[which(cum_weight >= 0.5)[1]] / 12,
-               Q1 = Age[which(cum_weight >= 0.25)[1]] / 12,
-               Q3 = Age[which(cum_weight >= 0.75)[1]] / 12,
-               .groups = 'drop')
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge)
 
-locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
+# make cluster to parallel
+cl_incidence <- makeCluster(length(locations))
+
+# setting parallel
+clusterExport(cl_incidence, c("data_median_age", "locations", "get_weights", "gaussian_kernel"))
+
+# get median age of each location
+data_median_age <- parLapply(cl_incidence, locations, function(locat){
+     library(dplyr)
+     
+     get_weights(data_median_age, locat) |>
+          group_by(location_name, year) |>
+          summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
+                    Q1 = Age[min(which(cum_weight >= 0.25))]/12,
+                    Q3 = Age[min(which(cum_weight >= 0.75))]/12,
+                    .groups = 'drop')
+})
+
+data_median_age <- do.call(rbind, data_median_age)
+
+# stop cluster
+stopCluster(cl_incidence)
+
+# visualize median age ----------------------------------------------------
 fill_colors <- c(paletteer_d("MoMAColors::OKeeffe"), "#019875FF")
 names(fill_colors) <- locations
 
@@ -133,10 +161,9 @@ fig1 <- wrap_plots(outcome, ncol = 4) + plot_layout(guides = "collect")
 
 panel_a_g <- data_median_age
 
-# map ---------------------------------------------------------------------
+# loading map data --------------------------------------------------------
 
 ## loading data
-
 data_map <- st_read("./data/world.zh.json") |> 
      filter(iso_a3  != "ATA")
 data_map_iso <- read.csv('./data/iso_code.csv')
@@ -172,6 +199,7 @@ data_incidence_zero <- data_incidence |>
                All = AllCases >= 40,
                .groups = 'drop')
 
+# estimate national median age --------------------------------------------
 ## estimate median age
 data_incidence <- data_incidence |> 
      filter(age_name %in% c('<28 days', '1-5 months', '6-11 months', '12-23 months', '2-4 years',
@@ -205,6 +233,8 @@ data_incidence <- data_incidence |>
 
 data_location$location_name[!data_location$location_name %in% unique(data_incidence$location_name)]
 
+locations <- unique(data_incidence$location_name)
+
 data_median_age <- data_incidence |> 
      rowwise() |>
      mutate(AgeList = if_else(is.na(StartAge), list(NA_real_), list(seq(StartAge, EndAge, 0.1))) ) |>
@@ -213,22 +243,32 @@ data_median_age <- data_incidence |>
      group_by(location_name, year, AgeList) |>
      mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
-     group_by(location_name, year) |>
-        mutate(Width = EndAge - StartAge,
-               WeightedCases = ifelse(AverageCases > 0, 
-                                      sapply(Age, function(age) {
-                                              weights <- gaussian_kernel(Age, age, Width) 
-                                              sum(weights * AverageCases) / sum(weights)
-                                      }),
-                                      0)) |>
-     mutate(Weight = WeightedCases / sum(WeightedCases),
-            cum_weight = cumsum(Weight)) |>
-     summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
-               Q1 = Age[min(which(cum_weight >= 0.25))]/12,
-               Q3 = Age[min(which(cum_weight >= 0.75))]/12,
-               .groups = 'drop')
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge)
 
+# make cluster to parallel
+cl_incidence <- makeCluster(50)
+
+# setting parallel
+clusterExport(cl_incidence, c("data_median_age", "locations", "get_weights", "gaussian_kernel"))
+
+# get median age of each location
+data_median_age <- parLapply(cl_incidence, locations, function(locat){
+     library(dplyr)
+     
+     get_weights(data_median_age, locat) |>
+          group_by(location_name, year) |>
+          summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
+                    Q1 = Age[min(which(cum_weight >= 0.25))]/12,
+                    Q3 = Age[min(which(cum_weight >= 0.75))]/12,
+                    .groups = 'drop')
+})
+
+data_median_age <- do.call(rbind, data_median_age)
+
+# stop cluster
+stopCluster(cl_incidence)
+
+# visualize median age ----------------------------------------------------
 data_median_diff <- data_median_age |> 
      select(location_name, year, MedianAge) |>
      pivot_wider(names_from = year, values_from = MedianAge) |>
