@@ -83,6 +83,7 @@ data_clean_age <- data_clean_case |>
 
 locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
 
+# data_median_age <- panel_a_g
 
 # estimate median ---------------------------------------------------------
 

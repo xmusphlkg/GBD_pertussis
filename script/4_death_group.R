@@ -80,6 +80,8 @@ data_clean_age <- data_clean_death |>
 
 locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
 
+# data_median_age <- panel_a_g
+
 # estimate median age -----------------------------------------------------
 
 # get median age of each location
@@ -155,7 +157,6 @@ plot_fun <- function(i){
 outcome <- lapply(1:length(locations), plot_fun)
 
 outcome[[length(locations) + 1]] <- guide_area()
-
 
 fig1 <- wrap_plots(outcome, ncol = 4) + plot_layout(guides = "collect")
 
@@ -271,6 +272,7 @@ stopCluster(cl_death)
 panel_h_l <- data_median_age
 
 data_median_diff <- data_median_age |> 
+     select(location_name, year, MedianAge) |>
      pivot_wider(names_from = year, values_from = MedianAge) |>
      mutate(Diff1 = `2019` - `1990`,
             Diff2 = `2021` - `1990`) |>
