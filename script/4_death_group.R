@@ -6,10 +6,6 @@ library(Cairo)
 library(sf)
 library(openxlsx)
 
-library(future)
-library(furrr)
-library(purrr)
-
 # loading data ------------------------------------------------------------
 
 data_raw_death <- read.csv('./data/preparedata/Region_age.csv')
@@ -70,7 +66,6 @@ gaussian_kernel <- function(x, mu, sigma) {
 }
 
 # get median age of each location
-plan(multisession, workers = 7)
 
 data_median_age <- data_clean_death|>
      rowwise() |>
@@ -84,13 +79,13 @@ data_median_age <- data_clean_death|>
      ungroup() |>
      select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
      group_by(location_name, year) |>
-     mutate(Width = EndAge - StartAge,
-            WeightedCases = ifelse(AverageCases > 0, 
-                                   future_map_dbl(Age, ~{
-                                        weights <- gaussian_kernel(Age, .x, Width) 
-                                        sum(weights * AverageCases) / sum(weights)
-                                   }, .options = future_options(globals = TRUE)),
-                                   0)) |>
+        mutate(Width = EndAge - StartAge,
+               WeightedCases = ifelse(AverageCases > 0, 
+                                      sapply(Age, function(age) {
+                                              weights <- gaussian_kernel(Age, age, Width) 
+                                              sum(weights * AverageCases) / sum(weights)
+                                      }),
+                                      0)) |>
      mutate(Weight = WeightedCases / sum(WeightedCases),
             cum_weight = cumsum(Weight)) |>
      summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
@@ -179,8 +174,6 @@ data_death_zero <- data_death |>
                .groups = 'drop')
 
 ## estimate median age
-plan(multisession, workers = 40)
-
 data_death <- data_death |> 
      filter(age_name %in% c('<28 days', '1-5 months', '6-11 months', '12-23 months', '2-4 years',
                             '5-9 years', '10-14 years', '15-19 years', '20-24 years', '25-29 years',
@@ -221,13 +214,13 @@ data_median_age <- data_death |>
      ungroup() |>
      select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
      group_by(location_name, year) |>
-     mutate(Width = EndAge - StartAge,
-            WeightedCases = ifelse(AverageCases > 0, 
-                                   future_map_dbl(Age, ~{
-                                        weights <- gaussian_kernel(Age, .x, Width) 
-                                        sum(weights * AverageCases) / sum(weights)
-                                   }, .options = future_options(globals = TRUE)),
-                                   0)) |>
+        mutate(Width = EndAge - StartAge,
+               WeightedCases = ifelse(AverageCases > 0, 
+                                      sapply(Age, function(age) {
+                                              weights <- gaussian_kernel(Age, age, Width) 
+                                              sum(weights * AverageCases) / sum(weights)
+                                      }),
+                                      0)) |>
      mutate(Weight = WeightedCases / sum(WeightedCases),
             cum_weight = cumsum(Weight)) |>
      summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
