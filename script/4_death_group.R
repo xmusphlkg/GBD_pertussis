@@ -4,10 +4,11 @@ library(paletteer)
 library(patchwork)
 library(Cairo)
 library(sf)
+library(openxlsx)
 
 # loading data ------------------------------------------------------------
 
-data_raw_death <- read.csv('./data/preparedata/Age_group.csv')
+data_raw_death <- read.csv('./data/preparedata/Region_age.csv')
 
 data_raw_death <- data_raw_death |> 
      filter(measure_name == "Deaths" & metric_name %in% c("Number") & year >= 1990) |>
@@ -59,6 +60,11 @@ data_clean_age <- data_clean_death |>
 
 # Main --------------------------------------------------------------------
 
+# define gaussian kernel
+gaussian_kernel <- function(x, mu, sigma) {
+     exp(-0.5 * ((x - mu) / sigma)^2) / (sigma * sqrt(2 * pi))
+}
+
 # get median age of each location
 data_median_age <- data_clean_death|>
      rowwise() |>
@@ -68,13 +74,18 @@ data_median_age <- data_clean_death|>
      unnest(cols = c(AgeList)) |>
      filter(!is.na(AgeList)) |>
      group_by(location_name, year, AgeList) |>
-     mutate(AverageCases = Cases / ((EndAge - StartAge)*10 + 1)) |>
+     mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases) |>
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
      group_by(location_name, year) |>
-     mutate(Weight = AverageCases / sum(AverageCases),
-            Weight = case_when(is.na(Weight) ~ 0,
-                               TRUE ~ Weight),
+     mutate(Width = EndAge - StartAge,
+            WeightedCases = ifelse(AverageCases > 0, 
+                                   sapply(Age, function(age) {
+                                        weights <- gaussian_kernel(Age, age, Width) 
+                                        sum(weights * AverageCases) / sum(weights)
+                                   }),
+                                   0)) |>
+     mutate(Weight = WeightedCases / sum(WeightedCases),
             cum_weight = cumsum(Weight)) |>
      summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
                Q1 = Age[min(which(cum_weight >= 0.25))]/12,
@@ -198,13 +209,18 @@ data_median_age <- data_death |>
      unnest(cols = c(AgeList)) |>
      filter(!is.na(AgeList)) |>
      group_by(location_name, year, AgeList) |>
-     mutate(AverageCases = Cases / ((EndAge - StartAge)*10 + 1)) |>
+     mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases) |>
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
      group_by(location_name, year) |>
-     mutate(Weight = AverageCases / sum(AverageCases),
-            Weight = case_when(is.na(Weight) ~ 0,
-                               TRUE ~ Weight),
+     mutate(Width = EndAge - StartAge,
+            WeightedCases = ifelse(AverageCases > 0, 
+                                   sapply(Age, function(age) {
+                                        weights <- gaussian_kernel(Age, age, Width) 
+                                        sum(weights * AverageCases) / sum(weights)
+                                   }),
+                                   0)) |>
+     mutate(Weight = WeightedCases / sum(WeightedCases),
             cum_weight = cumsum(Weight)) |>
      summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
                .groups = 'drop')
@@ -290,6 +306,7 @@ ggsave(filename = "outcome/fig4.pdf",
        device = cairo_pdf,
        family = "Arial")
 
-
 write.xlsx(list(panel_a_g = panel_a_g, panel_h_l = panel_h_l),
            "outcome/fig4.xlsx", rowNames = FALSE)
+
+save.image("outcome/fig4.RData")

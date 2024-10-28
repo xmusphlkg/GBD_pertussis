@@ -62,25 +62,34 @@ data_clean_age <- data_clean_case |>
 
 # Main --------------------------------------------------------------------
 
-# get median age of each location
-data_median_age <- data_clean_case|>
+# define gaussian kernel
+gaussian_kernel <- function(x, mu, sigma) {
+     exp(-0.5 * ((x - mu) / sigma)^2) / (sigma * sqrt(2 * pi))
+}
+
+# Get median age of each location
+data_median_age <- data_clean_case |> 
      rowwise() |>
      mutate(AgeList = if_else(is.na(StartAge), list(NA_real_), list(seq(StartAge, EndAge, 0.1)))) |>
      unnest(cols = c(AgeList)) |>
      filter(!is.na(AgeList)) |>
      group_by(location_name, year, AgeList) |>
-     mutate(AverageCases = Cases / ((EndAge - StartAge)*10 + 1)) |>
+     mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases) |>
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
      group_by(location_name, year) |>
-     mutate(Weight = AverageCases / sum(AverageCases),
-            Weight = case_when(is.na(Weight) ~ 0,
-                               TRUE ~ Weight),
+     mutate(Width = EndAge - StartAge,
+            WeightedCases = ifelse(AverageCases > 0, 
+                                   sapply(Age, function(age) {
+                                        weights <- gaussian_kernel(Age, age, Width) 
+                                        sum(weights * AverageCases) / sum(weights)
+                                   }),
+                                   0)) |>
+     mutate(Weight = WeightedCases / sum(WeightedCases),
             cum_weight = cumsum(Weight)) |>
-     # calculate median age, and trans back to year
-     summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
-               Q1 = Age[min(which(cum_weight >= 0.25))]/12,
-               Q3 = Age[min(which(cum_weight >= 0.75))]/12,
+     summarise(MedianAge = Age[which(cum_weight >= 0.5)[1]] / 12,
+               Q1 = Age[which(cum_weight >= 0.25)[1]] / 12,
+               Q3 = Age[which(cum_weight >= 0.75)[1]] / 12,
                .groups = 'drop')
 
 locations <- c('Global', 'Africa', 'Eastern Mediterranean', 'Europe', 'Americas', 'South-East Asia', 'Western Pacific')
@@ -111,7 +120,7 @@ plot_fun <- function(i){
                 legend.position = "bottom")+
           labs(title = paste0(letters[i], ") ", location),
                x = "Year",
-               y = "Age of Cases",
+               y = "Age of cases",
                fill = "Median (Q1, Q3)",
                color = "Median (Q1, Q3)")
 }
@@ -197,18 +206,24 @@ data_incidence <- data_incidence |>
 data_location$location_name[!data_location$location_name %in% unique(data_incidence$location_name)]
 
 data_median_age <- data_incidence |> 
+     filter(location_name == "People's Republic of China") |> 
      rowwise() |>
      mutate(AgeList = if_else(is.na(StartAge), list(NA_real_), list(seq(StartAge, EndAge, 0.1))) ) |>
      unnest(cols = c(AgeList)) |>
      filter(!is.na(AgeList)) |>
      group_by(location_name, year, AgeList) |>
-     mutate(AverageCases = Cases / ((EndAge - StartAge)*10 + 1)) |>
+     mutate(AverageCases = Cases / ((EndAge - StartAge) * 10 + 1)) |>
      ungroup() |>
-     select(location_name, year, Age = AgeList, AverageCases) |>
+     select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge) |>
      group_by(location_name, year) |>
-     mutate(Weight = AverageCases / sum(AverageCases),
-            Weight = case_when(is.na(Weight) ~ 0,
-                               TRUE ~ Weight),
+     mutate(Width = EndAge - StartAge,
+            WeightedCases = ifelse(AverageCases > 0, 
+                                   sapply(Age, function(age) {
+                                        weights <- gaussian_kernel(Age, age, Width) 
+                                        sum(weights * AverageCases) / sum(weights)
+                                   }),
+                                   0)) |>
+     mutate(Weight = WeightedCases / sum(WeightedCases),
             cum_weight = cumsum(Weight)) |>
      summarise(MedianAge = Age[min(which(cum_weight >= 0.5))]/12,
                Q1 = Age[min(which(cum_weight >= 0.25))]/12,
@@ -216,6 +231,7 @@ data_median_age <- data_incidence |>
                .groups = 'drop')
 
 data_median_diff <- data_median_age |> 
+     select(location_name, year, MedianAge) |>
      pivot_wider(names_from = year, values_from = MedianAge) |>
      mutate(Diff1 = `2019` - `1990`,
             Diff2 = `2021` - `1990`) |>
@@ -232,12 +248,12 @@ data_map_year <- data_map |>
      left_join(data_median_diff, by = c("iso_a3" = "ISO3"))
 
 plot_map <- function(i){
-     value <- names(data_median_diff)[i+2]
+     y <- names(data_median_diff)[i+2]
      data <- data_map_year |> 
-          select(location_name, geometry, all_of(value)) |> 
-          rename(`value` = value)
+          select(location_name, geometry, all_of(y)) |> 
+          rename(`value` = y)
      
-     if (str_detect(value, "Diff")){
+     if (str_detect(y, "Diff")){
           fill_colors <- c("#CAA5C2FF", "#DBC3D6FF", "#F5F5F5FF", "#FFD5C2FF", "#FEC0A3FF", "#FEAB85FF", "#BF714DFF", "#7F4B33FF")
           breaks <- pretty(c(data_median_diff$Diff1, data_median_diff$Diff2), n = 10)
           limits <- range(breaks)
@@ -298,3 +314,5 @@ ggsave(filename = "outcome/fig2.pdf",
 
 write.xlsx(list(panel_a_g = panel_a_g, panel_h_l = panel_h_l),
            "outcome/fig2.xlsx", rowNames = FALSE)
+
+save.image("outcome/fig2.RData")

@@ -228,9 +228,9 @@ ggsave(filename = "outcome/fig3.pdf",
        device = cairo_pdf,
        family = "Arial")
 
-
-
 write.xlsx(list(data_panel_A, data_panel_B, data_panel_C),
            file = "outcome/fig3.xlsx",
            asTable = TRUE,
            rowNames = FALSE)
+
+save.image("outcome/fig3.RData")

@@ -234,3 +234,5 @@ write.xlsx(list(data_panel_A, data_panel_B, data_panel_C),
            file = "outcome/fig1.xlsx",
            asTable = TRUE,
            rowNames = FALSE)
+
+save.image("outcome/fig1.RData")

@@ -8,6 +8,29 @@ library(factoextra)
 
 # loading data ------------------------------------------------------------
 
+data_global <- read.csv('./data/preparedata/Region_age.csv')
+
+data_global <- data_global |> 
+     filter(age_name %in% c('<28 days', '1-5 months', '6-11 months', '12-23 months', '2-4 years',
+                            '5-9 years', '10-14 years', '15-19 years', '20-24 years', '25-29 years',
+                            '30-34 years', '35-39 years', '40-44 years', '45-49 years', '50-54 years',
+                            '55-59 years', '60-64 years', '65-69 years', '70-74 years', '75-79 years',
+                            '80-84 years', '85-89 years', '90-94 years', '95+ years', 'All ages') &
+                 year >= 1990 &
+                 metric_name == "Rate") |> 
+     mutate(age_name = case_when(age_name %in% c('<28 days', '1-5 months', '6-11 months') ~ "[0,1)",
+                                 age_name %in% c('12-23 months') ~ "[1,2)",
+                                 age_name %in% c('2-4 years', '5-9 years') ~ "[2,9)",
+                                 age_name %in% c('10-14 years', '15-19 years') ~ "[10,19)",
+                                 TRUE ~ "[20,)"),
+            age_name = factor(age_name, levels = c("[0,1)", "[1,2)", "[2,9)", "[10,19)", "[20,)"))) |> 
+     group_by(year, location_name, age_name, measure_name) |>
+     select(year, location_name, age_name, measure_name, val) |> 
+     pivot_wider(names_from = measure_name, values_from = val)
+
+
+
+
 data_raw_all <- read.csv('./data/preparedata/Country_rate.csv')
 
 data_clean_all <- data_raw_all |> 
