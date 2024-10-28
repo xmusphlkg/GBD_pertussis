@@ -246,7 +246,7 @@ data_median_age <- data_incidence |>
      select(location_name, year, Age = AgeList, AverageCases, StartAge, EndAge)
 
 # make cluster to parallel
-cl_incidence <- makeCluster(50)
+cl_incidence <- makeCluster(30)
 
 # setting parallel
 clusterExport(cl_incidence, c("data_median_age", "locations", "get_weights", "gaussian_kernel"))

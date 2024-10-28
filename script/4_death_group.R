@@ -245,7 +245,7 @@ data_median_age <- data_death |>
 locations <- unique(data_median_age$location_name)
 
 # make cluster for parallel computing
-cl_death <- makeCluster(40)
+cl_death <- makeCluster(30)
 
 # setting up parallel computing
 clusterExport(cl_death, c("data_median_age", "locations", "get_weights", "gaussian_kernel"))
