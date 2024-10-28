@@ -243,12 +243,12 @@ data_map_year <- data_map |>
      left_join(data_median_diff, by = c("iso_a3" = "ISO3"))
 
 plot_map <- function(i){
-     value <- names(data_median_diff)[i+2]
+     y <- names(data_median_diff)[i+2]
      data <- data_map_year |> 
-          select(location_name, geometry, all_of(value)) |> 
-          rename(`value` = value)
+          select(location_name, geometry, all_of(y)) |> 
+          rename(`value` = y)
      
-     if (str_detect(value, "Diff")){
+     if (str_detect(y, "Diff")){
           fill_colors <- c("#CAA5C2FF", "#DBC3D6FF", "#F5F5F5FF", "#FFD5C2FF", "#FEC0A3FF", "#FEAB85FF", "#BF714DFF", "#7F4B33FF")
           breaks <- pretty(c(data_median_diff$Diff1, data_median_diff$Diff2), n = 10)
           limits <- range(breaks)
@@ -283,7 +283,7 @@ plot_map <- function(i){
           labs(title = paste0(letters[i+7], ") "),
                x = NULL,
                y = NULL,
-               fill = ifelse(str_detect(value, "Diff"),
+               fill = ifelse(str_detect(y, "Diff"),
                              'Difference of median age',
                              'Median age of deaths'))
 }
@@ -311,3 +311,5 @@ write.xlsx(list(panel_a_g = panel_a_g, panel_h_l = panel_h_l),
            "outcome/fig4.xlsx", rowNames = FALSE)
 
 save.image("outcome/fig4.RData")
+
+load("outcome/fig4.RData")
