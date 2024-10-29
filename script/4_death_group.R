@@ -200,6 +200,12 @@ data_death_zero <- data_death |>
                All = AllDeaths >= 40,
                .groups = 'drop')
 
+# summarize data
+daat_sum <- data_death_zero |> 
+     group_by(year) |>
+     mutate(percent = 100 * AllDeaths/sum(AllDeaths),
+            percent = round(percent, 2))
+
 # estimate national median age --------------------------------------------
 
 ## estimate median age
