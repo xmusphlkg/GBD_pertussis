@@ -63,7 +63,7 @@ data_country_cfr <- data_country_cfr |>
 data_country_map <- data_map |> 
      left_join(data_country_cfr, by = c("iso_a3" = "ISO3"))
 
-fig4 <- ggplot(data = data_country_map) +
+fig3 <- ggplot(data = data_country_map) +
      geom_sf(aes(fill = Cluster)) +
      # add x, y tick labels
      theme(axis.text.x = element_text(size = 8),
@@ -81,7 +81,7 @@ fig4 <- ggplot(data = data_country_map) +
            axis.title = element_text(color = 'black', face = 'plain'),
            plot.title.position = 'plot',
            legend.position = 'bottom')+
-     labs(title = paste0(letters[1], ") "),
+     labs(title = paste0(letters[3], ") "),
           x = NULL,
           y = NULL,
           fill = 'Level of case fatality rate')+
@@ -92,14 +92,14 @@ fig4 <- ggplot(data = data_country_map) +
 data_country_years <- data_country |> 
      filter(year %in% c(1990, 2021)) |> 
      as.data.frame() |> 
-     mutate(CFR = if_else(CFR > 2, 2, CFR))
+     mutate(CFR_l = if_else(CFR > 2, 2, CFR))
 
 plot_year <- function(i){
      data <- data_country_years |>
           filter(year == c(1990, 2021)[i]) |>
-          select(location_name, CFR) |>
+          select(location_name, CFR_l) |>
           left_join(data_map_iso, by = c("location_name" = "location_name"))
-     breaks <- pretty(c(data_country_years$CFR), n = 10)
+     breaks <- pretty(c(data_country_years$CFR_l), n = 10)
      limits <- range(breaks)
      fill_colors <- rev(paletteer_d("Redmonder::dPBIRdGn"))
      
@@ -107,7 +107,7 @@ plot_year <- function(i){
           left_join(data, by = c("iso_a3" = "ISO3"))
 
      ggplot(data = data) +
-          geom_sf(aes(fill = CFR)) +
+          geom_sf(aes(fill = CFR_l)) +
           # add x, y tick labels
           theme(axis.text.x = element_text(size = 8),
                 axis.text.y = element_text(size = 8)) +
@@ -128,17 +128,17 @@ plot_year <- function(i){
           guides(fill = guide_colorbar(barwidth = 20,
                                        title.position = 'top',
                                        barheight = 1)) +
-          labs(title = paste0(letters[i + 1], ") "),
+          labs(title = paste0(letters[i], ") "),
                x = NULL,
                y = NULL,
                fill = 'Case fatality rate (%) in 1990 and 2021')
 }
 
-fig5 <- plot_year(1)
+fig1 <- plot_year(1)
 
-fig6 <- plot_year(2)
+fig2 <- plot_year(2)
 
-fig <- fig4 + guide_area() + fig5 + fig6 +
+fig <- fig1 + fig2 + fig3 + guide_area() +
      plot_layout(guides = "collect", heights = c(1, 1))
 
 ggsave(filename = "outcome/fig6.pdf",

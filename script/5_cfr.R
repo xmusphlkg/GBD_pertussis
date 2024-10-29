@@ -72,6 +72,8 @@ fig2 <- plot_cfr(1)
 
 # all CFR -----------------------------------------------------------------
 
+fill_colors <- paletteer_d("Redmonder::qPBI")
+
 data_all <- data_global |> 
      filter(age_name == "All ages" & metric_name == "Rate") |>
      select(year, location_name, measure_name, val) |>
@@ -85,15 +87,15 @@ data_all <- data_global |>
                                       location_name == "Western Pacific Region" ~ "Western Pacific",
                                       TRUE ~ location_name),
             location_name = factor(location_name,
-                                   levels = rev(locations))) |> 
+                                   levels = locations)) |> 
      arrange(year)
 
 fig1 <- ggplot(data = data_all,
                mapping = aes(x = year, y = CFR, color = location_name)) +
-     geom_line(linetype = 'dashed') +
+     geom_line() +
      geom_point() +
      scale_x_continuous(breaks = seq(1990, 2021, 5),
-                        expand = expansion(mult = c(0.02, 0.02))) +
+                        expand = expansion(mult = c(0.02, 0.45))) +
      scale_y_continuous(breaks = breaks,
                         limits = range(breaks),
                         expand = expansion(mult = c(0, 0))) +
@@ -102,14 +104,17 @@ fig1 <- ggplot(data = data_all,
      theme(panel.grid = element_blank(),
            plot.title.position = 'plot',
            legend.background = element_blank(),
-           legend.position = c(0.5, 1),
-           legend.justification = c(0.5, 0.85))+
+           legend.position = c(1, 0.5),
+           legend.justification = c(1, 0.5))+
      labs(title = "a)",
           x = "Year",
           y = "Case fatality rate (%)",
           color = NULL)+
-     guides(color = guide_legend(ncol = 4, 
-                                 byrow = TRUE))
+     # reduce the space between legend items
+     guides(color = guide_legend(ncol = 1, 
+                                 byrow = TRUE,
+                                 keyheight = unit(0.4, "cm"),
+                                 keywidth = unit(0.4, "cm")))
 
 # save ---------------------------------------------------------------------
 
