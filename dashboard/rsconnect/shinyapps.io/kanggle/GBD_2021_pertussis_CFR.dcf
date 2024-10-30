@@ -1,0 +1,14 @@
+name: GBD_2021_pertussis_CFR
+title: GBD_2021_pertussis_CFR
+username:
+account: kanggle
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13178912
+bundleId: 9291005
+url: https://kanggle.shinyapps.io/GBD_2021_pertussis_CFR/
+when: 1730286141.75658
+lastSyncTime: 1730286141.75659
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: cleandata.R|country.csv|iso_code.csv|map.RData|world.zh.json
